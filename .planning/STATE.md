@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 1
-status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-08-18T23:39:23.766Z"
+status: executing
+stopped_at: Phase 1 Plan A complete — Walking Skeleton code shipped (commits e1b18fa, 2446a50, 53154e9). Runtime verify awaits DATABASE_URL/OPENROUTER_API_KEY/INSFORGE_*/WORKER_SHARED_SECRET.
+last_updated: "2026-08-19T01:55:00.000Z"
 progress:
-  total_phases: 1
+  total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
 ---
 
 # Project State: SDLC AI Agent Playground
@@ -27,10 +27,21 @@ progress:
 ## Current Position
 
 - **Phase:** 1 - Foundation
-- **Plan:** not started
-- **Status:** Ready to plan
-- **Progress:** 0/8 phases complete
-- **Next action:** `/gsd-plan-phase 1`
+- **Plans:** 4 PLAN files; 01-A (Walking Skeleton) code complete, 01-B/01-C/01-D pending
+- **Status:** Plan A complete; runtime verify awaits provisioned infra (DATABASE_URL, OPENROUTER_API_KEY, INSFORGE_*, WORKER_SHARED_SECRET)
+- **Progress:** 0/8 phases complete; 1/4 PLANs executed (01-A), 3/4 pending
+- **Next action:** Provision infra and run `pnpm smoke` to lift the Walking Skeleton gate; then `/gsd-execute-phase 1 --plan B` (or B/C/D in parallel since they're wave-2, independent of each other modulo per-file contention on ChatPanel.tsx + HealthBanner.tsx — see W1)
+
+### Plan-file split (revision-2)
+
+Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/` (one file per GSD executor pass):
+
+- `01-A-tracer.md` — Walking Skeleton gate (Wave 1). Tasks `01-01a-scaffold`, `01-01b-runtime`.
+- `01-B-persistence-and-rag.md` — Wave 2. Tasks `01-02-storage`, `01-02b-mcp-lifecycle`, `01-05-audit-log`, `01-06-rag-scaffold`, `01-12-supabase-fallback`.
+- `01-C-hitl.md` — Wave 2. Tasks `01-03-tool-classifier`, `01-04a-write-low-gate`, `01-04b-write-high-gate`, `01-11-auto-approve-toggle`.
+- `01-D-ui-and-resilience.md` — Wave 2. Tasks `01-07-health-banner`, `01-08-cost-hud`, `01-09-stage-picker`, `01-10-action-feed`, `01-13-tab-reconnect-pause`, `01-14-worker-watch-restart`, `01-15-smoke-script`.
+
+`01-SKELETON.md` is the gate file. The old consolidated `01-PLAN.md` was deleted.
 
 ## Performance Metrics
 
@@ -38,10 +49,20 @@ progress:
 |--------|-------|
 | Phases planned | 8 |
 | Phases complete | 0 |
-| Plans executed | 0 |
+| Plans executed | 1 |
 | Plans verified | 0 |
 | Plans failed | 0 |
 | Avg plans/phase | - |
+
+## Decisions Log (from executed plans)
+
+| Date | Decision | Source |
+|------|----------|--------|
+| 2026-08-19 | D-01 accepted: Mastra as agent runtime (one-way) | 01-A checkpoint:decision |
+| 2026-08-19 | D-02 accepted: Nemotron 3 Ultra free via OpenRouter | 01-A checkpoint:decision |
+| 2026-08-19 | D-05 accepted: local-only worker topology | 01-A checkpoint:decision |
+| 2026-08-19 | D-22 accepted: env-var bearer auth for operator | 01-A checkpoint:decision |
+| 2026-08-19 | Added `@ai-sdk/react@2.0.0` for AI SDK v7 useChat (deviation Rule 3) | 01-A 01-01b |
 
 ## Accumulated Context
 
@@ -78,14 +99,36 @@ progress:
 
 ## Session Continuity
 
-**Stopped at:** Phase 1 context gathered
-**Resume file:** .planning/phases/01-foundation/01-CONTEXT.md
+**Stopped at:** Phase 1 plan verified
+**Resume file:** .planning/phases/01-foundation/plans/01-A-tracer.md
 
-**Last session:** 2026-08-18T23:39:23.749Z
+**Last session:** 2026-08-19T00:30:00.000Z
 
 **Resume command:** `/gsd-resume-work`
 
-**Next phase to plan:** Phase 1 - Foundation
+**Next phase to plan:** Phase 2 — Notion MCP Integration (after Phase 1 execution completes)
+
+### Phase 1 Planning Artifacts
+
+| File | Purpose |
+|---|---|
+| `.planning/phases/01-foundation/01-CONTEXT.md` | Locked decisions D-01..D-22, scope, deferred |
+| `.planning/phases/01-foundation/01-RESEARCH.md` | Implementation patterns; `(RESOLVED)` open questions |
+| `.planning/phases/01-foundation/01-SKELETON.md` | Walking Skeleton gate (Definition of Skeleton Done) |
+| `.planning/phases/01-foundation/plans/01-A-tracer.md` | Wave 1 (2 tasks): scaffold + runtime |
+| `.planning/phases/01-foundation/plans/01-B-persistence-and-rag.md` | Wave 2 (5 tasks): storage, lifecycle, audit, RAG, fallback |
+| `.planning/phases/01-foundation/plans/01-C-hitl.md` | Wave 2 (4 tasks): classifier, write_low, write_high, auto-approve |
+| `.planning/phases/01-foundation/plans/01-D-ui-and-resilience.md` | Wave 2 (7 tasks): UI shell, action feed, session resume, smoke |
+
+### Pass-3 Verification Notes (5 follow-ups, non-blocking)
+
+| # | Type | Item |
+|---|---|---|
+| W1 | execution-time | Wave 2 plans B/C/D overlap on `ChatPanel.tsx` + `HealthBanner.tsx` + health routes — executor must serialize or coordinate per-file |
+| W2 | execution-time | Plan D has 7 tasks, Plan B has 5 — split if execution context tightens |
+| W3 | patched in PLAN-C | `01-04b` verify command replaced grep-on-DESTRUCTIVE-byte with grep-on-toolName=applyMigrations (chunk payload assertion) |
+| W4 | patched in PLAN-D | `01-15` verify command references undefined `smoke-or-stopped-worker` script — replaced with `bash scripts/smoke-stopped-worker.sh`, added to `files_modified` |
+| W5 | informational | `01-NOTES.md` absent pre-execution (created on 01-06 run) |
 
 ---
 

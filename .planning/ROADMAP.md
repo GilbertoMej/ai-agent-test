@@ -30,7 +30,7 @@
   3. User sees a real-time action feed listing every tool the agent invokes with status
   4. Read-only tools run silently; low-risk writes prompt the user; high-risk writes demand typed confirmation; the "auto-approve all" toggle bypasses prompts for the current session
   5. User sees a running token-cost estimate in the header
-**Plans**: TBD
+**Plans**: 4 (A-tracer, B-persistence-and-rag, C-hitl, D-ui-and-resilience) — verified PASS-WITH-NOTES, ready to execute
 **UI hint**: yes
 
 ### Phase 2: Notion MCP Integration
@@ -122,7 +122,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 1/4 | 01-A complete (Walking Skeleton code shipped; runtime verify awaits infra) | 2026-08-19 |
 | 2. Notion MCP Integration | 0/TBD | Not started | - |
 | 3. Linear MCP Integration | 0/TBD | Not started | - |
 | 4. v0 Design + Coding Sub-agent | 0/TBD | Not started | - |
@@ -135,3 +135,4 @@
 
 *Roadmap created: 2026-08-18*
 *Mode: mvp | Granularity: standard | Coverage: 40/40*
+*Phase 1 plan verified 2026-08-19: 4/4 PLANs, 0 blockers, 5 follow-ups (W1, W2 execution-time; W3, W4 patched; W5 informational)*
