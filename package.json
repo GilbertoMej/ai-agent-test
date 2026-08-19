@@ -1,0 +1,45 @@
+{
+  "name": "sdlc-ai-agent-playground",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx scripts/predev.ts && concurrently -k -n web,worker -c blue,magenta \"next dev -p 3000\" \"tsx watch worker/src/index.ts\"",
+    "worker": "tsx watch worker/src/index.ts",
+    "predev": "tsx scripts/predev.ts",
+    "build": "next build",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:generate": "drizzle-kit generate",
+    "embed:tools": "tsx scripts/embed-tool-docs.ts",
+    "smoke": "bash scripts/smoke.sh",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.3.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "@mastra/core": "1.60.0",
+    "@mastra/mcp": "1.21.0",
+    "@mastra/pg": "1.21.0",
+    "@mastra/memory": "1.27.0",
+    "@ai-sdk/openai-compatible": "3.0.31",
+    "@insforge/sdk": "1.5.2",
+    "drizzle-orm": "0.45.2",
+    "postgres": "3.4.9",
+    "zod": "4.4.3",
+    "ai": "7.0.68",
+    "openai": "5.10.1",
+    "nanoid": "5.0.9",
+    "react-markdown": "9.0.1"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3",
+    "@types/node": "22.10.5",
+    "@types/react": "19.0.2",
+    "@types/react-dom": "19.0.2",
+    "drizzle-kit": "0.31.10",
+    "concurrently": "10.0.5",
+    "tsx": "4.23.12",
+    "dotenv": "16.4.7"
+  },
+  "packageManager": "pnpm@11.22.0"
+}
