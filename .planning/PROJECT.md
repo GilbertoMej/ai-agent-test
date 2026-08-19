@@ -102,4 +102,9 @@ This document evolves at phase transitions and milestone boundaries.
 5. Update Context with current state
 
 ---
-*Last updated: 2026-08-18 after initialization*
+*Last updated: 2026-08-19 — Phase 1 (Foundation) complete. Walking Skeleton + persistence + RAG scaffold + HITL gates + UI shell + resilience shipped end-to-end (5/5 plans, 19/19 must-haves verified).*
+
+**Phase 1 deviations worth noting:**
+- Runtime pivoted from Claude Agent SDK to Mastra per D-01 (one-way decision, recorded in `01-CONTEXT.md`).
+- Backend: InsForge (preferred) + Supabase fallback per D-04 / D-12.
+- Free-tier Anthropic API spend is the only paid cost.
