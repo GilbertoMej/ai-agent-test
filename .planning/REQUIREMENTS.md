@@ -83,7 +83,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **BCK-01**: InsForge project provisioned with Postgres schema for sessions, audit log, vector store, snapshots
 - [ ] **BCK-02**: Auth via InsForge single-user mode (no multi-user)
 - [ ] **BCK-03**: Vector store (pgvector) holds two collections: `tool_docs` (build-time) and `project_context` (deferred to v2 — see v2 Requirements)
-- [ ] **BCK-04**: Audit log persists every tool call with `stage`, `tool_name`, `args_hash`, `result_status`, `tokens_used`, `timestamp`
+- [x] **BCK-04**: Audit log persists every tool call with `stage`, `tool_name`, `args_hash`, `result_status`, `tokens_used`, `timestamp`
 - [ ] **BCK-05**: Supabase+pgvector fallback config is documented and deployable in one switch if InsForge free-tier limits bite
 
 ## v2 Requirements
@@ -181,7 +181,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BCK-01 | Phase 1 | Pending |
 | BCK-02 | Phase 1 | Pending |
 | BCK-03 | Phase 1 | Pending |
-| BCK-04 | Phase 1 | Pending |
+| BCK-04 | Phase 1 | Complete |
 | BCK-05 | Phase 1 | Pending |
 
 **Coverage:**
