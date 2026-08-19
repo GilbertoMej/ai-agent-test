@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import type { ToolApprovalContext } from "@mastra/core/tools";
 import { echoTool } from "../tools/echo";
 import { createNoteTool } from "../tools/create-note";
 import { applyMigrationsTool } from "../tools/apply-migrations";
@@ -6,6 +7,10 @@ import { resolveApproval, loadActiveGrants, type ApprovalMode } from "../lib/app
 
 // D-02: Nemotron 3 Ultra free via OpenRouter. 1M context, 65K output, tool calling supported.
 // D-21 (research): `maxSteps: 4-6` keeps free-tier tool-call degradation from derailing long runs.
+// Mastra 1.60: the `gateway` field was removed from the model config object; pass a
+// `provider/model` string and Mastra auto-routes via the provider registry.
+// `modelSettings: { maxTokens }` moved off the agent config — Mastra 1.60 only accepts
+// it inside a model-fallbacks array. Per-call `agent.stream(messages, { maxTokens })` covers it.
 export const sdlcAgent = new Agent({
   id: "sdlcAgent",
   name: "SDLC Agent",
@@ -13,20 +18,17 @@ export const sdlcAgent = new Agent({
     "You are the SDLC Playground agent. For Phase 1 (Walking Skeleton), you have echo (read), " +
     "createNote (write_low), and applyMigrations (write_high). Use createNote when the user asks for a note; " +
     "use applyMigrations when the user asks to migrate. For everything else, answer from chat.",
-  model: {
-    id: "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
-    gateway: "openrouter",
-  },
-  modelSettings: { maxTokens: 8192 },
+  model: "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
   tools: { echoTool, createNoteTool, applyMigrationsTool },
 });
 
-// Per-call `requireToolApproval` resolver. Honors session-wide approvalMode
-// (from AutoApproveToggle) and active approval_grants (5-min batch button).
+// Per-call `requireToolApproval` resolver (Mastra 1.60 signature).
+// Honors session-wide approvalMode (from AutoApproveToggle) and active approval_grants (5-min batch button).
+// 'always' from resolveApproval() maps to true (gate the call); false/true map through unchanged.
 export async function toolApprovalResolver(
-  toolName: string,
-  ctx?: { approvalMode?: ApprovalMode },
-): Promise<boolean | "always"> {
+  ctx: ToolApprovalContext,
+): Promise<boolean> {
+  const rc = (ctx.requestContext ?? {}) as { approvalMode?: ApprovalMode };
   const grants = await loadActiveGrants();
-  return resolveApproval(toolName, { approvalMode: ctx?.approvalMode, grants });
+  return resolveApproval(ctx.toolName, { approvalMode: rc.approvalMode, grants }) === "always";
 }

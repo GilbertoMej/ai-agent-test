@@ -12,18 +12,19 @@ export { classify, type ToolClass };
 export type AuditExtras = { tool_doc_rows_consumed?: number };
 
 // Wraps an async tool execute with audit_log writes. Per-tool call -> exactly one row.
-// Tokens are patched post-hoc from step-finish.totalUsage (no double-write here).
+// Tokens default to 0 here; patchTokens() updates them post-hoc from step-finish.totalUsage.
 export function withAudit<TArgs, TRet>(
   toolId: string,
   classification: ToolClass,
-  fn: (args: TArgs) => Promise<TRet & Partial<AuditExtras>>,
+  fn: (args: TArgs, ctx?: AuditToolContext) => Promise<TRet & Partial<AuditExtras>>,
 ) {
-  return async (args: TArgs): Promise<TRet> => {
+  return async (args: TArgs, ctx?: AuditToolContext): Promise<TRet> => {
+    const sessionId = resolveSessionId(ctx);
     const start = Date.now();
     let status: "ok" | "error" = "ok";
-    let out: TRet & Partial<AuditExtras>;
+    let out: TRet & Partial<AuditExtras> | undefined;
     try {
-      out = await fn(args);
+      out = await fn(args, ctx);
       return out;
     } catch (e) {
       status = "error";
@@ -38,16 +39,35 @@ export function withAudit<TArgs, TRet>(
       const extras: AuditExtras = (out as Partial<AuditExtras>) ?? {};
       await db.insert(auditLog).values({
         id: nanoid(),
-        session_id: process.env.SESSION_ID ?? "anon",
+        session_id: sessionId,
         tool_name: toolId,
         args_json: redact(args),
         result_status: status,
         approval_decision: classification === "read" ? "auto" : null,
         duration_ms: Date.now() - start,
         tool_doc_rows_consumed: extras.tool_doc_rows_consumed ?? null,
+        // Default tokens to 0 so the column is IS NOT NULL even before patchTokens() runs.
+        // patchTokens() updates the most-recent row for (session_id, tool_name) on step-finish.
+        tokens_in: 0,
+        tokens_out: 0,
       });
     }
   };
+}
+
+// Tool-execution context — createTool.execute passes a 2nd arg; we accept the
+// fields we care about and ignore the rest. sessionId wins over requestContext.
+export type AuditToolContext = {
+  sessionId?: string;
+  requestContext?: { get?: (key: string) => unknown } | unknown;
+};
+
+function resolveSessionId(ctx: AuditToolContext | undefined): string {
+  if (ctx?.sessionId) return ctx.sessionId;
+  const rc = ctx?.requestContext as { get?: (key: string) => unknown } | undefined;
+  const fromRc = rc?.get?.("sessionId");
+  if (typeof fromRc === "string" && fromRc.length > 0) return fromRc;
+  return process.env.SESSION_ID ?? "anon";
 }
 
 // Called from the stream step-finish handler to patch the most-recent audit row
