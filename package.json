@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "embed:tools": "tsx scripts/embed-tool-docs.ts",
     "smoke": "bash scripts/smoke.sh",
+    "test:audit": "node --import tsx --test worker/src/lib/audit.test.ts",
     "tsc": "tsc --noEmit"
   },
   "dependencies": {

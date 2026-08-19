@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { redact } from "@/lib/redact";
@@ -27,17 +28,21 @@ export function classify(toolName: string): ToolClass {
   return "write_high";
 }
 
-// Wraps an async tool execute with audit_log writes. Per-tool call → exactly one row.
+// Optional fields a tool can attach to its audit_log row (01-05).
+// rag_query populates tool_doc_rows_consumed; future tools can extend.
+export type AuditExtras = { tool_doc_rows_consumed?: number };
+
+// Wraps an async tool execute with audit_log writes. Per-tool call -> exactly one row.
 // Tokens are patched post-hoc from step-finish.totalUsage (no double-write here).
 export function withAudit<TArgs, TRet>(
   toolId: string,
   classification: ToolClass,
-  fn: (args: TArgs) => Promise<TRet>,
+  fn: (args: TArgs) => Promise<TRet & Partial<AuditExtras>>,
 ) {
   return async (args: TArgs): Promise<TRet> => {
     const start = Date.now();
     let status: "ok" | "error" = "ok";
-    let out: TRet;
+    let out: TRet & Partial<AuditExtras>;
     try {
       out = await fn(args);
       return out;
@@ -45,6 +50,13 @@ export function withAudit<TArgs, TRet>(
       status = "error";
       throw e;
     } finally {
+      // Redact both args_json AND any result content that flows out (defensive — secrets should never reach logs).
+      // The audit_log schema has no result_content column (locked 01-01a); we log the redacted result to console only.
+      const redactedResult = redact(out as unknown);
+      if (process.env.AUDIT_LOG_RESULTS === "1") {
+        console.log(`audit: ${toolId} -> ${redactedResult}`);
+      }
+      const extras: AuditExtras = (out as Partial<AuditExtras>) ?? {};
       await db.insert(auditLog).values({
         id: nanoid(),
         session_id: process.env.SESSION_ID ?? "anon",
@@ -53,31 +65,27 @@ export function withAudit<TArgs, TRet>(
         result_status: status,
         approval_decision: classification === "read" ? "auto" : null,
         duration_ms: Date.now() - start,
+        tool_doc_rows_consumed: extras.tool_doc_rows_consumed ?? null,
       });
     }
   };
 }
 
 // Called from the stream step-finish handler to patch the most-recent audit row
-// for this session+tool with token counts. Returns the row id.
+// for this session+tool with token counts.
 export async function patchTokens(
   sessionId: string,
   toolId: string,
   tokensIn: number,
   tokensOut: number,
 ): Promise<void> {
-  // Postgres bigint mode: number is fine in JS until ~2^53.
-  await db.execute(
-    // Drizzle's sql-tag is fine here; raw call keeps the patch simple.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (await import("drizzle-orm")).sql`
-      UPDATE audit_log
-      SET tokens_in = ${tokensIn}, tokens_out = ${tokensOut}
-      WHERE id = (
-        SELECT id FROM audit_log
-        WHERE session_id = ${sessionId} AND tool_name = ${toolId}
-        ORDER BY ts DESC LIMIT 1
-      )
-    ` as any,
-  );
+  await db.execute(sql`
+    UPDATE audit_log
+    SET tokens_in = ${tokensIn}, tokens_out = ${tokensOut}
+    WHERE id = (
+      SELECT id FROM audit_log
+      WHERE session_id = ${sessionId} AND tool_name = ${toolId}
+      ORDER BY ts DESC LIMIT 1
+    )
+  `);
 }
