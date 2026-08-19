@@ -212,6 +212,8 @@ pnpm smoke:stopped-worker         # stops the worker, then re-runs — exits 0
 - Commits exist: `365adf5`, `b7e6275`, `debf372`, `ac17e50`, `7e63daf`, `457e3d6`, `de15cf5` verified via `git log --oneline`.
 - `status: complete` set; the orchestrator can advance the plan counter and mark Phase 1 done.
 
+## Self-Check: PASSED
+
 ## Threat Flags
 
 | Flag | File | Description |
