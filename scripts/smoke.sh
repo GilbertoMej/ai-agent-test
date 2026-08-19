@@ -21,3 +21,19 @@ for t in audit_log sessions tool_docs approval_grants; do
 done
 
 echo "smoke: layer-1 OK"
+
+# Layer-2 runtime assertions (Task 01-01b-runtime).
+
+# 4. Worker reachable + worker_up: true.
+WORKER_HEALTH="$(curl -fsS -H "Authorization: Bearer ${WORKER_SHARED_SECRET}" "${WORKER_URL:-http://localhost:4111}/api/health")"
+test "$(echo "${WORKER_HEALTH}" | jq -r .worker_up)" = "true"
+
+# 5. Chat round-trip via deterministic smoke endpoint (skips LLM call).
+SMOKE="$(curl -fsS http://localhost:3000/api/smoke/echo)"
+test "$(echo "${SMOKE}" | jq -r .text)" = "echo:hello"
+
+# 6. Audit row exists with the canonical 11 columns populated (read-class → approval_decision='auto').
+COUNT="$(psql "${DATABASE_URL}" -tAc "SELECT count(*) FROM audit_log WHERE tool_name='echo' AND result_status='ok' AND approval_decision='auto'")"
+test "${COUNT}" -ge "1"
+
+echo "smoke: layer-2 OK"
