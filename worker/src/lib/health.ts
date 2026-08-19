@@ -1,21 +1,17 @@
 import { registerApiRoute } from "@mastra/core/server";
+import { probeAll } from "../mcp/health-probe";
 
 // /api/health — UI-07 banner + smoke assertion.
-// D-06: per-stage lazy MCP loading means the four Phase-1 MCPs are `not_loaded` until the user picks a stage.
-// Real connectivity probe ships in 01-02b-mcp-lifecycle (Wave 2).
+// Per-server status comes from the lifecycle probe, not env-var presence (01-02b).
 export const healthRoute = registerApiRoute("/api/health", {
   method: "GET",
   handler: async (c) => {
     const mastra = c.get("mastra");
+    const mcp = await probeAll();
     return c.json({
       worker_up: true,
       sessions_active: 0,
-      mcp: {
-        notion: "not_loaded",
-        linear: "not_loaded",
-        playwright: "not_loaded",
-        sentry: "not_loaded",
-      },
+      mcp,
       tokens: {
         openrouter_key_present: !!process.env.OPENROUTER_API_KEY,
         insforge_key_present: !!process.env.INSFORGE_SERVICE_KEY,
