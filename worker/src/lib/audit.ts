@@ -3,30 +3,9 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { auditLog } from "@/db/schema";
 import { redact } from "@/lib/redact";
+import { classify, type ToolClass } from "./classify";
 
-// D-13: hardcoded per tool name. Refined in Phase 2-7 once real MCP tool names exist.
-export type ToolClass = "read" | "write_low" | "write_high";
-
-export function classify(toolName: string): ToolClass {
-  if (toolName === "echo") return "read";
-  // Phase 1 working set per research §2.1. Extend as MCPs ship.
-  if (
-    toolName.startsWith("get_") ||
-    toolName.startsWith("list_") ||
-    toolName.startsWith("search_") ||
-    toolName.startsWith("preview_") ||
-    toolName === "rag_query"
-  )
-    return "read";
-  if (
-    toolName === "write_file" ||
-    toolName === "git_commit" ||
-    toolName === "run_tests" ||
-    toolName === "sandbox_e2e"
-  )
-    return "write_low";
-  return "write_high";
-}
+export { classify, type ToolClass };
 
 // Optional fields a tool can attach to its audit_log row (01-05).
 // rag_query populates tool_doc_rows_consumed; future tools can extend.
