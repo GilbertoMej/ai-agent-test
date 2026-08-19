@@ -9,26 +9,26 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Web UI
 
-- [ ] **UI-01**: User can chat with the agent in a streaming interface (Vercel AI SDK `useChat`)
-- [ ] **UI-02**: User can pick which SDLC stage(s) to run (Planning, Tickets, Design, Code, Test, Review, Deploy, Observe)
-- [ ] **UI-03**: User sees a real-time action feed showing every tool call the agent makes
-- [ ] **UI-04**: User session persists across browser refresh via `localStorage` session id + server-side session resume
-- [ ] **UI-05**: User sees friendly error toasts with auto-retry for transient failures
-- [ ] **UI-06**: User sees running token cost estimate in the header
-- [ ] **UI-07**: App shows a startup health check banner (MCP servers connected, tokens valid)
+- [x] **UI-01**: User can chat with the agent in a streaming interface (Vercel AI SDK `useChat`)
+- [x] **UI-02**: User can pick which SDLC stage(s) to run (Planning, Tickets, Design, Code, Test, Review, Deploy, Observe)
+- [x] **UI-03**: User sees a real-time action feed showing every tool call the agent makes
+- [x] **UI-04**: User session persists across browser refresh via `localStorage` session id + server-side session resume
+- [x] **UI-05**: User sees friendly error toasts with auto-retry for transient failures
+- [x] **UI-06**: User sees running token cost estimate in the header
+- [x] **UI-07**: App shows a startup health check banner (MCP servers connected, tokens valid)
 - [ ] **UI-08**: User can replay any past stage from a snapshot stored in InsForge
 
 ### Agent Runtime
 
-- [ ] **RT-01**: Agent loop is implemented with the Claude Agent SDK (TypeScript) — owns tool routing, sub-agents, hooks, sessions, permissions
-- [ ] **RT-02**: Agent runtime worker is a long-lived Node process emitting SSE events to the Next.js API relay
-- [ ] **RT-03**: MCP server lifecycle (stdio spawn, handshake, tool-list cache, auto-reconnect) is managed by the SDK wrapper with retry-with-reconnect on error
+- [x] **RT-01**: Agent loop is implemented with the Claude Agent SDK (TypeScript) — owns tool routing, sub-agents, hooks, sessions, permissions
+- [x] **RT-02**: Agent runtime worker is a long-lived Node process emitting SSE events to the Next.js API relay
+- [x] **RT-03**: MCP server lifecycle (stdio spawn, handshake, tool-list cache, auto-reconnect) is managed by the SDK wrapper with retry-with-reconnect on error
 - [ ] **RT-04**: Sub-agent spawning uses a structured `handoff` object (`{ stage, prd_summary, prior_decisions[], relevant_ids[] }`); sub-agent depth capped at 2
 
 ### Human-in-the-Loop
 
-- [ ] **HITL-01**: Every tool is classified at registration as `read` / `write_low_risk` / `write_high_risk`; `read` is auto-approved, `write_low_risk` shows a prompt, `write_high_risk` requires typed confirmation
-- [ ] **HITL-02**: User can toggle "auto-approve all" to bypass prompts for the current session (default: off)
+- [x] **HITL-01**: Every tool is classified at registration as `read` / `write_low_risk` / `write_high_risk`; `read` is auto-approved, `write_low_risk` shows a prompt, `write_high_risk` requires typed confirmation
+- [x] **HITL-02**: User can toggle "auto-approve all" to bypass prompts for the current session (default: off)
 
 ### Notion (MCP)
 
@@ -143,20 +143,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-01 | Phase 1 | Pending |
-| UI-02 | Phase 1 | Pending |
-| UI-03 | Phase 1 | Pending |
-| UI-04 | Phase 1 | Pending |
-| UI-05 | Phase 1 | Pending |
-| UI-06 | Phase 1 | Pending |
-| UI-07 | Phase 1 | Pending |
+| UI-01 | Phase 1 | Complete |
+| UI-02 | Phase 1 | Complete |
+| UI-03 | Phase 1 | Complete |
+| UI-04 | Phase 1 | Complete |
+| UI-05 | Phase 1 | Complete |
+| UI-06 | Phase 1 | Complete |
+| UI-07 | Phase 1 | Complete |
 | UI-08 | Phase 8 | Pending |
-| RT-01 | Phase 1 | Pending |
-| RT-02 | Phase 1 | Pending |
-| RT-03 | Phase 1 | Pending |
+| RT-01 | Phase 1 | Complete |
+| RT-02 | Phase 1 | Complete |
+| RT-03 | Phase 1 | Complete |
 | RT-04 | Phase 4 | Pending |
-| HITL-01 | Phase 1 | Pending |
-| HITL-02 | Phase 1 | Pending |
+| HITL-01 | Phase 1 | Complete |
+| HITL-02 | Phase 1 | Complete |
 | NOT-01 | Phase 2 | Pending |
 | NOT-02 | Phase 2 | Pending |
 | NOT-03 | Phase 2 | Pending |

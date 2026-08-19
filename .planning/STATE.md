@@ -3,14 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 1
+current_plan: D
+total_plans: 4
 status: in_progress
-stopped_at: Phase 1 Plan C complete — classifier + write_low + write_high + auto-approve toggle shipped. 01-D (UI + resilience) pending.
-last_updated: "2026-08-19T10:00:00.000Z"
+stopped_at: Phase 1 Plan D complete — UI + resilience shipped (health banner tokens/uptime, cost HUD, stage picker, action feed, transient retry, pause/resume, smoke script locked).
+last_updated: "2026-08-19T16:04:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State: SDLC AI Agent Playground
@@ -27,10 +29,10 @@ progress:
 ## Current Position
 
 - **Phase:** 1 - Foundation
-- **Plans:** 4 PLAN files; 01-A, 01-B, 01-C complete; 01-D (UI + resilience) pending
-- **Status:** Plan C shipped classifier + write_low + write_high + auto-approve toggle. Approve/Decline record audit_log; 5-min batch button writes approval_grants.
-- **Progress:** 0/8 phases complete; 3/4 PLANs executed, 1/4 pending (01-D)
-- **Next action:** Run `/gsd-execute-phase 1 --plan D` for UI + resilience (health banner, cost HUD, stage picker, action feed, reconnect-pause, smoke).
+- **Plans:** 4 PLAN files; 01-A, 01-B, 01-C, 01-D complete
+- **Status:** Plan D shipped health-banner tokens + uptime_s, cost HUD, stage picker (Foundation enabled + 8 greyed SDLC stages), action feed + transient retry (1s/2s/4s), pause/resume + localStorage session id, tsx watch restart smoke, and the locked full-smoke script (24 assertions).
+- **Progress:** 0/8 phases complete; 4/4 PLANs executed; Phase 1 Definition of Skeleton Done is wired end-to-end.
+- **Next action:** Mark Phase 1 complete; plan Phase 2 (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
 
@@ -49,7 +51,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 |--------|-------|
 | Phases planned | 8 |
 | Phases complete | 0 |
-| Plans executed | 3 |
+| Plans executed | 4 |
 | Plans halted | 0 |
 | Plans verified | 0 |
 | Plans failed | 0 |
@@ -70,6 +72,10 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-19 | Used `node:test` instead of vitest for audit tests (deviation Rule 3) | 01-B 01-05 |
 | 2026-08-19 | D-13 accepted: hardcoded 3-tier classifier (no config layer) | 01-C 01-03 checkpoint:decision |
 | 2026-08-19 | Resume via follow-up message, not streaming tool-result (Phase 2 polish) | 01-C deviation |
+| 2026-08-19 | D-07 implemented: pause-on-disconnect via sendBeacon → /api/pause → worker /pause; SSE resume via listSuspendedRuns | 01-D 01-13 |
+| 2026-08-19 | D-15 implemented: greyed stage tooltip = 'Available in Phase X'; /api/stage returns friendly payload for non-Phase-1 stages | 01-D 01-09 |
+| 2026-08-19 | UI-05 implemented: TransientAgentError + withTransientRetry (1s/2s/4s); permanent errors toast immediately | 01-D 01-10 |
+| 2026-08-19 | localStorage session id key: `sdlc.playground.session.v1` (UI-04) | 01-D 01-13 |
 
 ## Accumulated Context
 
