@@ -4,11 +4,13 @@ import { useChat } from "@ai-sdk/react";
 import { useEffect, useState } from "react";
 import { ApprovalCard, type ApprovalTier } from "./ApprovalCard";
 import { AutoApproveToggle } from "./AutoApproveToggle";
+import { CostCounter } from "./CostCounter";
 import type { ApprovalMode } from "@/worker/src/lib/approval";
 
 // Vercel AI SDK `useChat`. Streams from /api/chat -> worker SSE.
 // 01-04 / 01-11 — inline ApprovalCard for write_low + write_high tool calls
 // and a header AutoApproveToggle that threads approvalMode into the body.
+// 01-08 — header CostCounter aggregates message.usage across the session.
 
 interface ToolApprovalPart {
   type: "tool-call-approval" | string;
@@ -63,7 +65,10 @@ export function ChatPanel() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 12, color: "#8b94a7" }}>Session: {sessionId}</span>
-        <AutoApproveToggle value={approvalMode} onChange={setApprovalMode} />
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <CostCounter messages={messages as unknown as Parameters<typeof CostCounter>[0]["messages"]} />
+          <AutoApproveToggle value={approvalMode} onChange={setApprovalMode} />
+        </div>
       </div>
       <div
         style={{
