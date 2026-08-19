@@ -4,7 +4,18 @@ import { useEffect, useState } from "react";
 import { StatusBadge } from "./StatusBadge";
 
 // Polls /api/health every 30s. UI-07 banner. Per-server MCP status surfaced from the probe (01-02b).
-type Health = { worker_up: boolean; mcp?: Record<string, string> };
+// 01-07 — immediate probe on page load (tick() runs in useEffect mount); flips red within 30s of worker stop.
+type Tokens = {
+  openrouter_key_present?: boolean;
+  insforge_key_present?: boolean;
+  database_url_present?: boolean;
+};
+type Health = {
+  worker_up: boolean;
+  mcp?: Record<string, string>;
+  tokens?: Tokens;
+  uptime_s?: number;
+};
 const SERVER_LABEL: Record<string, string> = {
   notion: "Notion",
   linear: "Linear",
@@ -15,6 +26,11 @@ const STATE_COLOR: Record<string, string> = {
   connected: "#34c759",
   not_loaded: "#8b94a7",
   failed: "#ff453a",
+};
+const TOKEN_LABEL: Record<keyof Tokens, string> = {
+  openrouter_key_present: "OR",
+  insforge_key_present: "IF",
+  database_url_present: "DB",
 };
 
 export function HealthBanner() {
@@ -53,7 +69,18 @@ export function HealthBanner() {
         flexWrap: "wrap",
       }}
     >
-      <StatusBadge state={state} label={state === "green" ? "worker up" : state === "yellow" ? "checking..." : "worker offline"} />
+      <StatusBadge
+        state={state}
+        label={
+          state === "green"
+            ? health?.uptime_s != null
+              ? `worker up · ${health.uptime_s}s`
+              : "worker up"
+            : state === "yellow"
+              ? "checking..."
+              : "worker offline"
+        }
+      />
       <span style={{ fontSize: 12, color: "#8b94a7" }}>SDLC Playground — Phase 1</span>
       {health?.mcp && (
         <div style={{ display: "flex", gap: 10, fontSize: 12 }}>
@@ -71,6 +98,25 @@ export function HealthBanner() {
               {SERVER_LABEL[id] ?? id}: {status}
             </span>
           ))}
+        </div>
+      )}
+      {health?.tokens && (
+        <div style={{ display: "flex", gap: 8, fontSize: 11 }}>
+          {(Object.keys(TOKEN_LABEL) as Array<keyof Tokens>).map((k) => {
+            const present = !!health.tokens?.[k];
+            return (
+              <span
+                key={k}
+                title={k}
+                style={{
+                  color: present ? "#34c759" : "#ff8a80",
+                  fontFamily: "monospace",
+                }}
+              >
+                {TOKEN_LABEL[k]}:{present ? "✓" : "✗"}
+              </span>
+            );
+          })}
         </div>
       )}
     </header>
