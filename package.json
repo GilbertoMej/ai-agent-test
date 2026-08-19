@@ -20,7 +20,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "@mastra/core": "1.60.0",
-    "@mastra/mcp": "1.21.0",
+    "@mastra/mcp": "1.17.0",
     "@mastra/pg": "1.21.0",
     "@mastra/memory": "1.27.0",
     "@ai-sdk/openai-compatible": "3.0.31",
