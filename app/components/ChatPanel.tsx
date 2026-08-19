@@ -5,12 +5,15 @@ import { useEffect, useState } from "react";
 import { ApprovalCard, type ApprovalTier } from "./ApprovalCard";
 import { AutoApproveToggle } from "./AutoApproveToggle";
 import { CostCounter } from "./CostCounter";
+import { ActionFeed, type FeedPart } from "./ActionFeed";
 import type { ApprovalMode } from "@/worker/src/lib/approval";
 
 // Vercel AI SDK `useChat`. Streams from /api/chat -> worker SSE.
 // 01-04 / 01-11 — inline ApprovalCard for write_low + write_high tool calls
 // and a header AutoApproveToggle that threads approvalMode into the body.
 // 01-08 — header CostCounter aggregates message.usage across the session.
+// 01-10 / UI-03 / UI-05 — ActionFeed renders inline bubbles for every tool part;
+// TransientAgentError retried 3 times (1s/2s/4s); permanent errors surface toast.
 
 interface ToolApprovalPart {
   type: "tool-call-approval" | string;
@@ -20,9 +23,44 @@ interface ToolApprovalPart {
   tier?: ApprovalTier;
 }
 
+// Marks an error as transient — these get retried with backoff. Network errors / 5xx / timeout.
+export class TransientAgentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TransientAgentError";
+  }
+}
+
+export function isTransient(err: unknown): boolean {
+  if (err instanceof TransientAgentError) return true;
+  if (!(err instanceof Error)) return false;
+  const m = err.message.toLowerCase();
+  return m.includes("network") || m.includes("timeout") || m.includes("5") || m.includes("econn");
+}
+
+// 3 attempts at 1s/2s/4s — matches the C1 MCP reconnect ladder.
+const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+
+export async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (!isTransient(e) || attempt === RETRY_DELAYS_MS.length) throw e;
+      const delay = RETRY_DELAYS_MS[attempt];
+      console.warn(`retry: ${label} attempt=${attempt + 1} delay=${delay}ms`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
 export function ChatPanel() {
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("tiered");
   const [sessionId] = useState(() => `sess-${Math.random().toString(36).slice(2, 10)}`);
+  const [toast, setToast] = useState<string | null>(null);
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat({
     api: "/api/chat",
@@ -32,25 +70,44 @@ export function ChatPanel() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const onError = (e: ErrorEvent) => setErr(e.message);
+    const onError = (e: ErrorEvent) => {
+      const transient = isTransient(e);
+      setErr(transient ? `Transient error (will retry): ${e.message}` : e.message);
+      if (!transient) setToast(e.message);
+    };
     window.addEventListener("error", onError);
     return () => window.removeEventListener("error", onError);
   }, []);
 
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
   const decide = async (decision: "approve" | "decline", part: ToolApprovalPart, pattern?: string) => {
     const url = decision === "approve" ? "/api/approve" : "/api/decline";
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        toolCallId: part.toolCallId,
-        toolName: part.toolName,
-        args: part.args ?? {},
-        tier: part.tier,
-        pattern,
-        sessionId,
-      }),
-    });
+    try {
+      await withTransientRetry(
+        () =>
+          fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              args: part.args ?? {},
+              tier: part.tier,
+              pattern,
+              sessionId,
+            }),
+          }),
+        `${decision}:${part.toolName}`,
+      );
+    } catch (e) {
+      setToast(`Failed to ${decision}: ${(e as Error).message}`);
+      return;
+    }
     // Resume: send a follow-up so the agent re-runs the now-approved tool.
     await append({
       role: "user",
@@ -85,38 +142,57 @@ export function ChatPanel() {
             Type &quot;hello&quot; (read), &quot;create a note&quot; (write_low), or &quot;apply migrations&quot; (write_high).
           </p>
         )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              padding: "6px 8px",
-              margin: "4px 0",
-              borderRadius: 6,
-              background: m.role === "user" ? "#1f2532" : "#222a3a",
-              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-            }}
-          >
-            <strong style={{ fontSize: 12, color: "#8b94a7" }}>{m.role}</strong>
-            <div style={{ marginTop: 4 }}>
-              {m.content}
-              {(m as unknown as { parts?: ToolApprovalPart[] }).parts?.map((p, i) =>
-                p.type === "tool-call-approval" ? (
-                  <ApprovalCard
-                    key={i}
-                    tier={p.tier ?? "write_low"}
-                    toolName={p.toolName ?? "unknown"}
-                    args={p.args ?? {}}
-                    onApprove={() => decide("approve", p)}
-                    onDecline={() => decide("decline", p)}
-                    onApproveAll={(pat) => decide("approve", p, pat)}
-                  />
-                ) : null,
-              )}
+        {messages.map((m) => {
+          const parts = ((m as unknown as { parts?: unknown[] }).parts ?? []) as FeedPart[];
+          return (
+            <div
+              key={m.id}
+              style={{
+                padding: "6px 8px",
+                margin: "4px 0",
+                borderRadius: 6,
+                background: m.role === "user" ? "#1f2532" : "#222a3a",
+                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+              }}
+            >
+              <strong style={{ fontSize: 12, color: "#8b94a7" }}>{m.role}</strong>
+              <div style={{ marginTop: 4 }}>
+                {m.content}
+                <ActionFeed parts={parts} />
+                {parts.map((p, i) =>
+                  p.type === "tool-call-approval" ? (
+                    <ApprovalCard
+                      key={`card-${i}`}
+                      tier={(p as ToolApprovalPart).tier ?? "write_low"}
+                      toolName={p.toolName ?? "unknown"}
+                      args={p.args ?? {}}
+                      onApprove={() => decide("approve", p as ToolApprovalPart)}
+                      onDecline={() => decide("decline", p as ToolApprovalPart)}
+                      onApproveAll={(pat) => decide("approve", p as ToolApprovalPart, pat)}
+                    />
+                  ) : null,
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {err && <div style={{ color: "#ff8a80", fontSize: 12 }}>{err}</div>}
+      {toast && (
+        <div
+          role="status"
+          style={{
+            padding: "6px 10px",
+            borderRadius: 4,
+            background: "#2a1212",
+            border: "1px solid #ff5252",
+            color: "#ff8a80",
+            fontSize: 12,
+          }}
+        >
+          {toast}
+        </div>
+      )}
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8 }}>
         <input
           value={input}
