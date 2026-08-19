@@ -6,6 +6,8 @@ import { healthRoute } from "./lib/health";
 import { maybeRefreshEmbeddings } from "./lib/embed-bootstrap";
 import { registerApprovalRoutes, getApprovalHandlers } from "./lib/approval-route";
 import type { ApprovalPayload } from "./lib/approval-route";
+import { pauseRoute } from "./api-routes/pause";
+import { resumeRoute, suspendedListRoute } from "./api-routes/resume";
 
 // D-05: local-only worker. Boots in <2s with no MCPs loaded (D-06).
 // D-22: Next.js sends `Authorization: Bearer ${WORKER_SHARED_SECRET}` on every call.
@@ -28,6 +30,9 @@ export const mastra = new Mastra({
   },
   apiRoutes: [
     healthRoute,
+    pauseRoute,
+    resumeRoute,
+    suspendedListRoute,
     // 01-04 + 01-11 — approval/decline endpoints. Bearer auth via WORKER_SHARED_SECRET
     // is enforced by the Next.js routes; the worker trusts the call.
     {

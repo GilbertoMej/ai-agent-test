@@ -6,6 +6,7 @@ import { ApprovalCard, type ApprovalTier } from "./ApprovalCard";
 import { AutoApproveToggle } from "./AutoApproveToggle";
 import { CostCounter } from "./CostCounter";
 import { ActionFeed, type FeedPart } from "./ActionFeed";
+import { usePauseOnUnload, loadSessionId, saveSessionId } from "@/app/lib/pause-signal";
 import type { ApprovalMode } from "@/worker/src/lib/approval";
 
 // Vercel AI SDK `useChat`. Streams from /api/chat -> worker SSE.
@@ -59,7 +60,15 @@ export async function withTransientRetry<T>(fn: () => Promise<T>, label: string)
 
 export function ChatPanel() {
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("tiered");
-  const [sessionId] = useState(() => `sess-${Math.random().toString(36).slice(2, 10)}`);
+  // 01-13 / UI-04 — session id persists across refresh via localStorage key `sdlc.playground.session.v1`.
+  const [sessionId] = useState<string>(() => {
+    if (typeof window === "undefined") return `sess-${Math.random().toString(36).slice(2, 10)}`;
+    const existing = loadSessionId();
+    if (existing) return existing;
+    const fresh = `sess-${Math.random().toString(36).slice(2, 10)}`;
+    saveSessionId(fresh);
+    return fresh;
+  });
   const [toast, setToast] = useState<string | null>(null);
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat({
@@ -68,6 +77,9 @@ export function ChatPanel() {
   });
 
   const [err, setErr] = useState<string | null>(null);
+
+  // 01-13 / D-07 — pause the worker on tab close; SSE reconnect re-emits the same tool-call-approval chunk.
+  usePauseOnUnload(sessionId);
 
   useEffect(() => {
     const onError = (e: ErrorEvent) => {
