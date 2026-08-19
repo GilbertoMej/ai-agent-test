@@ -33,7 +33,8 @@ READMEs (Notion, Linear, Playwright, Sentry) and writes 1536-dim vectors to
 ## Smoke
 
 ```bash
-pnpm smoke                         # curl /api/smoke/echo + /api/health
+pnpm smoke                         # full Phase 1 Definition of Skeleton Done + post-01-02..01-14 surfaces
+pnpm smoke:stopped-worker          # asserts the contract holds when the worker is offline
 pnpm test:audit                    # node:test suite for audit redact + classify
 ```
 
@@ -49,4 +50,5 @@ pnpm test:audit                    # node:test suite for audit redact + classify
 ## Status
 
 Phase 1 plan A (walking skeleton) + plan B (storage, MCP lifecycle, audit, RAG)
-landed. Plans C (HITL) + D (UI + resilience) ship in the next wave.
++ plan C (HITL) + plan D (UI + resilience) landed. The full Phase 1 Definition of
+Skeleton Done is locked in via `pnpm smoke`.
