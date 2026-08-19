@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 1
 status: in_progress
-stopped_at: Phase 1 Plan B resumed from 01-06 halt and completed all 5 tasks. Commits: 6195374 (storage), cf6c8e0 (mcp-lifecycle), 8d47b46 (audit-log), 04cb93d (rag-scaffold), 2f23b64 (supabase-fallback). 01-C (HITL) + 01-D (UI + resilience) still pending.
-last_updated: "2026-08-19T09:00:00.000Z"
+stopped_at: Phase 1 Plan C complete — classifier + write_low + write_high + auto-approve toggle shipped. 01-D (UI + resilience) pending.
+last_updated: "2026-08-19T10:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State: SDLC AI Agent Playground
@@ -27,10 +27,10 @@ progress:
 ## Current Position
 
 - **Phase:** 1 - Foundation
-- **Plans:** 4 PLAN files; 01-A (Walking Skeleton) + 01-B (Persistence + RAG + MCP Lifecycle) complete, 01-C (HITL) + 01-D (UI + resilience) pending
-- **Status:** 01-B resumed from the 01-06 halt and landed all 5 tasks (storage, mcp-lifecycle, audit-log, rag-scaffold, supabase-fallback). Live embed probe resolved model + dims without a schema patch.
-- **Progress:** 0/8 phases complete; 2/4 PLANs executed (01-A, 01-B), 2/4 pending (01-C, 01-D)
-- **Next action:** Run `/gsd-execute-phase 1 --plan C` for HITL (tool classifier + write gates + auto-approve toggle). Then `/gsd-execute-phase 1 --plan D` for UI + resilience.
+- **Plans:** 4 PLAN files; 01-A, 01-B, 01-C complete; 01-D (UI + resilience) pending
+- **Status:** Plan C shipped classifier + write_low + write_high + auto-approve toggle. Approve/Decline record audit_log; 5-min batch button writes approval_grants.
+- **Progress:** 0/8 phases complete; 3/4 PLANs executed, 1/4 pending (01-D)
+- **Next action:** Run `/gsd-execute-phase 1 --plan D` for UI + resilience (health banner, cost HUD, stage picker, action feed, reconnect-pause, smoke).
 
 ### Plan-file split (revision-2)
 
@@ -49,7 +49,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 |--------|-------|
 | Phases planned | 8 |
 | Phases complete | 0 |
-| Plans executed | 2 |
+| Plans executed | 3 |
 | Plans halted | 0 |
 | Plans verified | 0 |
 | Plans failed | 0 |
@@ -68,6 +68,8 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-19 | D-04 accepted: `openai/text-embedding-3-small` @ 1536 dims (provisional; live probe required) | 01-B 01-06 checkpoint:decision |
 | 2026-08-19 | Live embed probe resolved D-04 to OpenRouter /v1/embeddings @ 1536 dims — NOTES.md | 01-B 01-06 resume |
 | 2026-08-19 | Used `node:test` instead of vitest for audit tests (deviation Rule 3) | 01-B 01-05 |
+| 2026-08-19 | D-13 accepted: hardcoded 3-tier classifier (no config layer) | 01-C 01-03 checkpoint:decision |
+| 2026-08-19 | Resume via follow-up message, not streaming tool-result (Phase 2 polish) | 01-C deviation |
 
 ## Accumulated Context
 
@@ -104,12 +106,12 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Phase 1 Plan B complete (5/5 tasks: 6195374, cf6c8e0, 8d47b46, 04cb93d, 2f23b64).
-**Resume file:** .planning/phases/01-foundation/01-B-SUMMARY.md
+**Stopped at:** Phase 1 Plan C complete (classifier + write_low + write_high + auto-approve).
+**Resume file:** .planning/phases/01-foundation/01-C-SUMMARY.md
 
-**Last session:** 2026-08-19T09:00:00.000Z
+**Last session:** 2026-08-19T10:00:00.000Z
 
-**Resume command:** `/gsd-execute-phase 1 --plan C`
+**Resume command:** `/gsd-execute-phase 1 --plan D`
 
 **Next phase to plan:** Phase 2 — Notion MCP Integration (after Phase 1 execution completes)
 

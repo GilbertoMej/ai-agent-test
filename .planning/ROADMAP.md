@@ -122,7 +122,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 2/4 | 01-A + 01-B complete (storage, mcp-lifecycle, audit-log, rag-scaffold, supabase-fallback landed); 01-C, 01-D pending | 2026-08-19 |
+| 1. Foundation | 3/4 | 01-A + 01-B + 01-C complete; 01-D pending | 2026-08-19 |
 | 2. Notion MCP Integration | 0/TBD | Not started | - |
 | 3. Linear MCP Integration | 0/TBD | Not started | - |
 | 4. v0 Design + Coding Sub-agent | 0/TBD | Not started | - |
