@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 1
-status: executing
-stopped_at: Phase 1 Plan A complete — Walking Skeleton code shipped (commits e1b18fa, 2446a50, 53154e9). Runtime verify awaits DATABASE_URL/OPENROUTER_API_KEY/INSFORGE_*/WORKER_SHARED_SECRET.
-last_updated: "2026-08-19T01:55:00.000Z"
+status: halted
+stopped_at: Phase 1 Plan B halted at 01-06 human-verify gate — commits 6195374 (storage), cf6c8e0 (mcp-lifecycle), 8d47b46 (audit-log). 01-06 + 01-12 deferred until INSFORGE_BASE_URL/Docker are provisioned.
+last_updated: "2026-08-19T08:01:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 0
@@ -27,10 +27,10 @@ progress:
 ## Current Position
 
 - **Phase:** 1 - Foundation
-- **Plans:** 4 PLAN files; 01-A (Walking Skeleton) code complete, 01-B/01-C/01-D pending
-- **Status:** Plan A complete; runtime verify awaits provisioned infra (DATABASE_URL, OPENROUTER_API_KEY, INSFORGE_*, WORKER_SHARED_SECRET)
-- **Progress:** 0/8 phases complete; 1/4 PLANs executed (01-A), 3/4 pending
-- **Next action:** Provision infra and run `pnpm smoke` to lift the Walking Skeleton gate; then `/gsd-execute-phase 1 --plan B` (or B/C/D in parallel since they're wave-2, independent of each other modulo per-file contention on ChatPanel.tsx + HealthBanner.tsx — see W1)
+- **Plans:** 4 PLAN files; 01-A (Walking Skeleton) code complete, 01-B halted at 01-06 (3/5 tasks committed), 01-C/01-D pending
+- **Status:** HALTED at 01-06 human-verify gate. Operator must provision `INSFORGE_BASE_URL` + `INSFORGE_SERVICE_KEY` and complete the live embedding probe documented in `.planning/phases/01-foundation/01-B-SUMMARY.md`, then re-run `/gsd-execute-phase 1 --plan B --resume` to land 01-06 + 01-12.
+- **Progress:** 0/8 phases complete; 1/4 PLANs executed (01-A), 1/4 halted (01-B at 01-06), 2/4 pending (01-C, 01-D)
+- **Next action:** Lift 01-B halt: set INSFORGE_BASE_URL + INSFORGE_SERVICE_KEY, run the live embed probe, patch `db/schema/tool-docs.ts` if dims != 1536, then resume.
 
 ### Plan-file split (revision-2)
 
@@ -50,6 +50,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phases planned | 8 |
 | Phases complete | 0 |
 | Plans executed | 1 |
+| Plans halted | 1 (01-B at 01-06 human-verify) |
 | Plans verified | 0 |
 | Plans failed | 0 |
 | Avg plans/phase | - |
@@ -63,6 +64,9 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-19 | D-05 accepted: local-only worker topology | 01-A checkpoint:decision |
 | 2026-08-19 | D-22 accepted: env-var bearer auth for operator | 01-A checkpoint:decision |
 | 2026-08-19 | Added `@ai-sdk/react@2.0.0` for AI SDK v7 useChat (deviation Rule 3) | 01-A 01-01b |
+| 2026-08-19 | D-04 accepted: PostgresStore as persistence backend | 01-B 01-02 checkpoint:decision |
+| 2026-08-19 | D-04 accepted: `openai/text-embedding-3-small` @ 1536 dims (provisional; live probe required) | 01-B 01-06 checkpoint:decision |
+| 2026-08-19 | Used `node:test` instead of vitest for audit tests (deviation Rule 3) | 01-B 01-05 |
 
 ## Accumulated Context
 
@@ -99,10 +103,10 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Phase 1 plan verified
-**Resume file:** .planning/phases/01-foundation/plans/01-A-tracer.md
+**Stopped at:** Phase 1 Plan B halted at 01-06 human-verify gate (commits 6195374, cf6c8e0, 8d47b46).
+**Resume file:** .planning/phases/01-foundation/01-B-SUMMARY.md
 
-**Last session:** 2026-08-19T00:30:00.000Z
+**Last session:** 2026-08-19T08:01:00.000Z
 
 **Resume command:** `/gsd-resume-work`
 

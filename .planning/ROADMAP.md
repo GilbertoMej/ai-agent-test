@@ -122,7 +122,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/4 | 01-A complete (Walking Skeleton code shipped; runtime verify awaits infra) | 2026-08-19 |
+| 1. Foundation | 1/4 + 1 halted | 01-A complete; 01-B halted at 01-06 human-verify (3/5 tasks committed; needs INSFORGE_BASE_URL + Docker to lift); 01-C, 01-D pending | 2026-08-19 |
 | 2. Notion MCP Integration | 0/TBD | Not started | - |
 | 3. Linear MCP Integration | 0/TBD | Not started | - |
 | 4. v0 Design + Coding Sub-agent | 0/TBD | Not started | - |
