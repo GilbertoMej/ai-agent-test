@@ -75,16 +75,16 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### RAG
 
-- [ ] **RAG-01**: Tool docs (per-MCP server) are embedded once at build into a pgvector collection
-- [ ] **RAG-02**: A retrieval tool is exposed to the agent; it embeds the agent's query, fetches top-k=5 from the tool docs collection, returns as context
+- [x] **RAG-01**: Tool docs (per-MCP server) are embedded once at build into a pgvector collection
+- [x] **RAG-02**: A retrieval tool is exposed to the agent; it embeds the agent's query, fetches top-k=5 from the tool docs collection, returns as context
 
 ### Backend (InsForge)
 
-- [ ] **BCK-01**: InsForge project provisioned with Postgres schema for sessions, audit log, vector store, snapshots
-- [ ] **BCK-02**: Auth via InsForge single-user mode (no multi-user)
-- [ ] **BCK-03**: Vector store (pgvector) holds two collections: `tool_docs` (build-time) and `project_context` (deferred to v2 — see v2 Requirements)
+- [x] **BCK-01**: InsForge project provisioned with Postgres schema for sessions, audit log, vector store, snapshots
+- [x] **BCK-02**: Auth via InsForge single-user mode (no multi-user)
+- [x] **BCK-03**: Vector store (pgvector) holds two collections: `tool_docs` (build-time) and `project_context` (deferred to v2 — see v2 Requirements)
 - [x] **BCK-04**: Audit log persists every tool call with `stage`, `tool_name`, `args_hash`, `result_status`, `tokens_used`, `timestamp`
-- [ ] **BCK-05**: Supabase+pgvector fallback config is documented and deployable in one switch if InsForge free-tier limits bite
+- [x] **BCK-05**: Supabase+pgvector fallback config is documented and deployable in one switch if InsForge free-tier limits bite
 
 ## v2 Requirements
 
@@ -176,15 +176,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEP-01 | Phase 6 | Pending |
 | DEP-02 | Phase 6 | Pending |
 | OBS-01 | Phase 7 | Pending |
-| RAG-01 | Phase 1 | Pending |
-| RAG-02 | Phase 1 | Pending |
-| BCK-01 | Phase 1 | Pending |
-| BCK-02 | Phase 1 | Pending |
-| BCK-03 | Phase 1 | Pending |
+| RAG-01 | Phase 1 | Complete |
+| RAG-02 | Phase 1 | Complete |
+| BCK-01 | Phase 1 | Complete |
+| BCK-02 | Phase 1 | Complete |
+| BCK-03 | Phase 1 | Complete |
 | BCK-04 | Phase 1 | Complete |
-| BCK-05 | Phase 1 | Pending |
+| BCK-05 | Phase 1 | Complete |
 
 **Coverage:**
+
 - v1 requirements: 38 total
 - Mapped to phases: 38
 - Unmapped: 0 ✓
