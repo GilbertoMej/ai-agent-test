@@ -33,7 +33,7 @@
   4. Read-only tools run silently; low-risk writes prompt the user; high-risk writes demand typed confirmation; the "auto-approve all" toggle bypasses prompts for the current session
   5. User sees a running token-cost estimate in the header
 
-**Plans**: 4 (A-tracer, B-persistence-and-rag, C-hitl, D-ui-and-resilience) — verified PASS-WITH-NOTES, ready to execute
+**Plans**: 4 (A-tracer, B-persistence-and-rag, C-hitl, D-ui-and-resilience) + 5 gap closures (E, G, H, I, J) — all executed; verified PASS-WITH-NOTES
 **UI hint**: yes
 
 ### Phase 2: Notion MCP Integration
