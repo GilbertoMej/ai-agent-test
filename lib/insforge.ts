@@ -1,4 +1,8 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+
+loadEnv();                              // .env
+loadEnv({ path: ".env.local" });        // .env.local wins
+
 import { createClient, type InsforgeClient } from "@insforge/sdk";
 
 // Single-user mode (D-22 / BCK-02). Server-side only — never expose to browser.

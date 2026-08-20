@@ -8,32 +8,23 @@ import { ActionFeedEntry, type FeedStatus } from "./ActionFeedEntry";
 
 export type FeedPart =
   | {
-      type: "tool-call";
-      toolCallId?: string;
-      toolName?: string;
-      args?: Record<string, unknown>;
+      type: "text";
+      text: string;
     }
   | {
-      type: "tool-result";
+      // AI SDK v5 — tool invocation part, type = `tool-${toolName}`. State drives rendering.
+      type: string;
       toolCallId?: string;
       toolName?: string;
-      result?: unknown;
-      durationMs?: number;
+      input?: Record<string, unknown>;
+      output?: unknown;
+      state?: "input-available" | "approval-requested" | "output-available" | "output-error" | "output-denied";
+      errorText?: string;
     }
   | {
-      type: "tool-error";
+      type: "tool-approval-request";
+      approvalId?: string;
       toolCallId?: string;
-      toolName?: string;
-      error?: string;
-      transient?: boolean;
-      durationMs?: number;
-    }
-  | {
-      type: "tool-call-approval";
-      toolCallId?: string;
-      toolName?: string;
-      tier?: "read" | "write_low" | "write_high";
-      args?: Record<string, unknown>;
     };
 
 export function ActionFeed({ parts }: { parts: FeedPart[] }) {
@@ -41,47 +32,37 @@ export function ActionFeed({ parts }: { parts: FeedPart[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", margin: "4px 0" }}>
       {parts.map((p, i) => {
-        const key = `${p.type}-${p.toolCallId ?? i}`;
-        if (p.type === "tool-call") {
+        const tp = p as unknown as {
+          type: string;
+          toolCallId?: string;
+          toolName?: string;
+          input?: Record<string, unknown>;
+          output?: unknown;
+          state?: string;
+          errorText?: string;
+        };
+        const key = `${tp.type}-${tp.toolCallId ?? i}`;
+        if (tp.type === "text") return null; // ChatPanel renders text
+        if (tp.type === "tool-approval-request") return null; // ChatPanel renders ApprovalCard
+        if (tp.type.startsWith("tool-")) {
+          // AI SDK v5 puts toolName only in the `type` prefix, not as a separate field.
+          const toolName = tp.toolName ?? tp.type.slice("tool-".length);
+          if (tp.state === "output-available") {
+            return <ActionFeedEntry key={key} status="success" toolName={toolName} result={tp.output} />;
+          }
+          if (tp.state === "output-error") {
+            return <ActionFeedEntry key={key} status="fail" toolName={toolName} error={tp.errorText} />;
+          }
           return (
             <ActionFeedEntry
               key={key}
-              status="running"
-              toolName={p.toolName ?? "unknown"}
-              args={p.args}
+              status={tp.state === "approval-requested" ? "approval" : "running"}
+              toolName={toolName}
+              args={tp.input}
             />
           );
         }
-        if (p.type === "tool-result") {
-          return (
-            <ActionFeedEntry
-              key={key}
-              status="success"
-              toolName={p.toolName ?? "unknown"}
-              result={p.result}
-              durationMs={p.durationMs}
-            />
-          );
-        }
-        if (p.type === "tool-error") {
-          return (
-            <ActionFeedEntry
-              key={key}
-              status="fail"
-              toolName={p.toolName ?? "unknown"}
-              error={p.error}
-              durationMs={p.durationMs}
-            />
-          );
-        }
-        return (
-          <ActionFeedEntry
-            key={key}
-            status="approval"
-            toolName={p.toolName ?? "unknown"}
-            args={p.args}
-          />
-        );
+        return null;
       })}
     </div>
   );

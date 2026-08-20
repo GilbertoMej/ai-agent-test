@@ -18,6 +18,7 @@ import { resumeRoute, suspendedListRoute } from "./api-routes/resume";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { MastraServer } from "@mastra/hono";
+import { convertToModelMessages, type UIMessage, type ModelMessage } from "ai";
 
 // D-05: local-only worker. Boots in <2s with no MCPs loaded (D-06).
 // D-22: Next.js sends `Authorization: Bearer ${WORKER_SHARED_SECRET}` on every call.
@@ -78,6 +79,20 @@ export const mastra = new Mastra({
           };
           const { messages, threadId, approvalMode, sessionId } = body;
           const agent = c.get("mastra").getAgent("sdlcAgent");
+          // 01-chat-debug: browser sends AI SDK v5 UIMessage[] (parts-format). Mastra 1.60
+          // agent.stream expects MessageListInput — pass ModelMessage[] via convertToModelMessages.
+          // Without this conversion the call silently produces no model output.
+          const modelMessages: ModelMessage[] = Array.isArray(messages)
+            ? await convertToModelMessages(messages as UIMessage[])
+            : [];
+          // ponytail: take only the latest user message. Phase 1 sdlcAgent has no memory
+          // configured yet, so passing the full client history causes the model to re-run
+          // every prior command each turn. Memory wiring is the proper fix — add when
+          // multi-turn context is a Phase 1 requirement (track in [mastra-1-60-stream-signature]).
+          const lastUser = [...modelMessages].reverse().find((m) => m.role === "user");
+          const promptMessages = lastUser ? [lastUser] : modelMessages;
+          console.log(`[chat-debug] in=${Array.isArray(messages) ? messages.length : 0} prompt=${promptMessages.length} thread=${threadId ?? "-"} mode=${approvalMode ?? "tiered"}`);
+          // ponytail: per-chunk logging stripped (was used to identify translation bug). Re-add only if regression.
           // RequestContext values are runtime-only; setRaw bypasses the declared-keys schema.
           const requestContext = new RequestContext();
           requestContext.setRaw("approvalMode", approvalMode ?? "tiered");
@@ -85,51 +100,93 @@ export const mastra = new Mastra({
           // Mastra 1.60: agent.stream signature is `(messages, { requireToolApproval,
           // requestContext, memory?: { thread, resource }, abortSignal })`. threadId/resourceId
           // moved into the `memory` option; PostgresStore is wired at the Mastra level.
-          const stream = await agent.stream(messages as never, {
+          // ponytail: do NOT pass c.req.raw.signal — the upstream LLM provider (opencode-go)
+          // reported "Client connection prematurely closed" when our request signal fired
+          // mid-stream. Let the agent finish naturally; if the browser closes, the worker
+          // discards remaining chunks (controller.enqueue throws after close).
+          const stream = await agent.stream(promptMessages, {
             requireToolApproval: toolApprovalResolver,
             requestContext,
             memory: threadId ? { thread: threadId, resource: "operator" } : undefined,
-            abortSignal: c.req.raw.signal,
           });
-          // Iterate fullStream as SSE. On step-finish, fire-and-forget patchTokens()
-          // so audit_log.tokens_in/out reflect real LLM usage (not the default 0).
+          // Translate Mastra fullStream → AI SDK v5 UIMessageChunk SSE so useChat's
+          // DefaultChatTransport can parse it. Token counting still rides on step-finish.
           const sseBody = new ReadableStream<Uint8Array>({
             async start(controller) {
               const encoder = new TextEncoder();
+              const msgId = crypto.randomUUID();
               let lastToolName = "sdlcAgent";
+              let textCount = 0;
               try {
-                for await (const chunk of stream.fullStream) {
-                  if (chunk.type === "tool-call") {
-                    lastToolName = chunk.payload?.toolName ?? lastToolName;
-                  }
-                  if (
-                    chunk.type === "step-finish" &&
-                    chunk.payload &&
-                    typeof chunk.payload === "object" &&
-                    "totalUsage" in chunk.payload &&
-                    chunk.payload.totalUsage
-                  ) {
-                    const usage = chunk.payload.totalUsage as {
-                      inputTokens?: number;
-                      outputTokens?: number;
-                    };
-                    void patchTokens(
-                      sessionId ?? "anon",
-                      lastToolName,
-                      usage.inputTokens ?? 0,
-                      usage.outputTokens ?? 0,
-                    ).catch(() => {});
-                  }
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-                }
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                controller.close();
-              } catch (e) {
                 controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ type: "error", error: String(e) })}\n\n`),
+                  encoder.encode(`data: ${JSON.stringify({ type: "start", messageId: msgId })}\n\n`),
                 );
+                for await (const chunk of stream.fullStream) {
+                  if (chunk.type === "text-start") {
+                    const id = (chunk.payload as { id?: string } | undefined)?.id ?? crypto.randomUUID();
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ type: "text-start", id })}\n\n`),
+                    );
+                  } else if (chunk.type === "text-delta") {
+                    const p = chunk.payload as { id?: string; text?: string } | undefined;
+                    textCount++;
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ type: "text-delta", id: p?.id ?? msgId, delta: p?.text ?? "" })}\n\n`),
+                    );
+                  } else if (chunk.type === "text-end") {
+                    const id = (chunk.payload as { id?: string } | undefined)?.id;
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ type: "text-end", id })}\n\n`),
+                    );
+                  } else if (chunk.type === "tool-call") {
+                    const p = chunk.payload as { toolCallId?: string; toolName?: string; args?: unknown } | undefined;
+                    const toolCallId = p?.toolCallId ?? crypto.randomUUID();
+                    lastToolName = p?.toolName ?? lastToolName;
+                    // Strip __mastraMetadata from args (not a tool input — Mastra internal).
+                    const args = (p?.args ?? {}) as Record<string, unknown>;
+                    delete (args as Record<string, unknown>)["__mastraMetadata"];
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ type: "tool-input-available", toolCallId, toolName: lastToolName, input: args })}\n\n`),
+                    );
+                  } else if (chunk.type === "tool-call-approval") {
+                    const p = chunk.payload as { toolCallId?: string } | undefined;
+                    const toolCallId = p?.toolCallId ?? crypto.randomUUID();
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ type: "tool-approval-request", approvalId: toolCallId, toolCallId })}\n\n`),
+                    );
+                  } else if (chunk.type === "tool-result") {
+                    const p = chunk.payload as { toolCallId?: string; result?: unknown } | undefined;
+                    if (p?.toolCallId) {
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ type: "tool-output-available", toolCallId: p.toolCallId, output: p.result })}\n\n`),
+                      );
+                    }
+                  } else if (chunk.type === "step-finish") {
+                    const payload = chunk.payload as { totalUsage?: { inputTokens?: number; outputTokens?: number } } | undefined;
+                    const usage = payload?.totalUsage;
+                    if (usage) {
+                      void patchTokens(
+                        sessionId ?? "anon",
+                        lastToolName,
+                        usage.inputTokens ?? 0,
+                        usage.outputTokens ?? 0,
+                      ).catch(() => {});
+                    }
+                  }
+                }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "finish" })}\n\n`));
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 controller.close();
+                console.log(`[chat-debug] ok text=${textCount} tool=${lastToolName}`);
+              } catch (e) {
+                console.log(`[chat-debug] err text=${textCount} msg=${e instanceof Error ? e.message : String(e)}`);
+                try {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ type: "error", error: e instanceof Error ? e.message : String(e) })}\n\n`),
+                  );
+                  controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                  controller.close();
+                } catch { /* controller closed mid-error — nothing to do */ }
               }
             },
           });
@@ -138,6 +195,7 @@ export const mastra = new Mastra({
               "Content-Type": "text/event-stream",
               "Cache-Control": "no-cache, no-transform",
               Connection: "keep-alive",
+              "X-Accel-Buffering": "no",
             },
           });
         },

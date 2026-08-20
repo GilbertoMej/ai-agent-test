@@ -12,7 +12,7 @@ interface ResumePayload {
 export const resumeRoute = registerApiRoute("/resume", {
   method: "POST",
   handler: async (c) => {
-    const body = (await c.json().catch(() => ({}))) as ResumePayload;
+    const body = (await c.req.json().catch(() => ({}))) as ResumePayload;
     const sessionId = body.sessionId ?? "anon";
     const wasSuspended = isSuspended(sessionId);
     clearSuspended(sessionId);

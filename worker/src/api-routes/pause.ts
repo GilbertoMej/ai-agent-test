@@ -27,7 +27,7 @@ export function clearSuspended(sessionId: string): void {
 export const pauseRoute = registerApiRoute("/pause", {
   method: "POST",
   handler: async (c) => {
-    const body = (await c.json().catch(() => ({}))) as PausePayload;
+    const body = (await c.req.json().catch(() => ({}))) as PausePayload;
     const sessionId = body.sessionId ?? "anon";
     suspendedRuns.set(sessionId, { pausedAt: Date.now() });
     return c.json({ ok: true, suspended: true, sessionId });

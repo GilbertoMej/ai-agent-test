@@ -1,6 +1,7 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
+import { useChat, type UIMessage } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useEffect, useState } from "react";
 import { ApprovalCard, type ApprovalTier } from "./ApprovalCard";
 import { AutoApproveToggle } from "./AutoApproveToggle";
@@ -17,11 +18,22 @@ import type { ApprovalMode } from "@/worker/src/lib/approval";
 // TransientAgentError retried 3 times (1s/2s/4s); permanent errors surface toast.
 
 interface ToolApprovalPart {
-  type: "tool-call-approval" | string;
+  type: string;
   toolCallId?: string;
   toolName?: string;
   args?: Record<string, unknown>;
   tier?: ApprovalTier;
+}
+
+// AI SDK v5 — approval-request chunk has { approvalId, toolCallId }.
+// Args + toolName live on the linked tool part (`tool-<name>` with same toolCallId).
+type ApprovalRequestPart = { type: "tool-approval-request"; approvalId: string; toolCallId: string };
+type ToolPart = { type: string; toolCallId?: string; toolName?: string; input?: Record<string, unknown> };
+
+function lookupToolPart(parts: unknown[], toolCallId: string): ToolPart | undefined {
+  return (parts as ToolPart[]).find(
+    (p) => typeof p?.type === "string" && p.type.startsWith("tool-") && p.toolCallId === toolCallId,
+  );
 }
 
 // Marks an error as transient — these get retried with backoff. Network errors / 5xx / timeout.
@@ -65,12 +77,27 @@ export function ChatPanel() {
   // post-mount useEffect below, which triggers a single re-render.
   // 01-13 / UI-04 — session id persists across refresh via localStorage key `sdlc.playground.session.v1`.
   const [sessionId, setSessionId] = useState<string>("");
+  const [input, setInput] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat({
-    api: "/api/chat",
-    body: { approvalMode, sessionId },
+  // AI SDK v5 useChat: sendMessage + status. body is passed via DefaultChatTransport
+  // (useChat v4's top-level `body` option was removed in v5).
+  // ponytail: cast — DefaultChatTransport from `ai` and ChatTransport from `@ai-sdk/react`
+  // are structurally identical but nominally distinct (different module identities).
+  const { messages, sendMessage, status } = useChat<UIMessage>({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: { approvalMode, sessionId },
+    }) as never,
   });
+  const isLoading = status === "submitted" || status === "streaming";
+
+  const onFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    sendMessage({ text: input });
+    setInput("");
+  };
 
   const [err, setErr] = useState<string | null>(null);
 
@@ -127,9 +154,8 @@ export function ChatPanel() {
       return;
     }
     // Resume: send a follow-up so the agent re-runs the now-approved tool.
-    await append({
-      role: "user",
-      content:
+    await sendMessage({
+      text:
         decision === "approve"
           ? `Continue with ${part.toolName} (approved).`
           : `Skip ${part.toolName} (denied).`,
@@ -175,21 +201,35 @@ export function ChatPanel() {
             >
               <strong style={{ fontSize: 12, color: "#8b94a7" }}>{m.role}</strong>
               <div style={{ marginTop: 4 }}>
-                {m.content}
+                {parts.map((p, i) => {
+                  const tp = p as unknown as { type: string; text?: string };
+                  return tp.type === "text" ? <span key={`txt-${i}`}>{tp.text}</span> : null;
+                })}
                 <ActionFeed parts={parts} />
-                {parts.map((p, i) =>
-                  p.type === "tool-call-approval" ? (
+                {parts.map((p, i) => {
+                  if (p.type !== "tool-approval-request") return null;
+                  const ap = p as unknown as ApprovalRequestPart;
+                  const toolPart = lookupToolPart(parts, ap.toolCallId);
+                  const toolName = (toolPart?.toolName) ?? (toolPart?.type?.startsWith("tool-") ? toolPart.type.slice("tool-".length) : "unknown");
+                  const approvalPart: ToolApprovalPart = {
+                    type: "tool-approval-request",
+                    toolCallId: ap.toolCallId,
+                    toolName,
+                    args: toolPart?.input ?? {},
+                    tier: "write_low",
+                  };
+                  return (
                     <ApprovalCard
                       key={`card-${i}`}
-                      tier={(p as ToolApprovalPart).tier ?? "write_low"}
-                      toolName={p.toolName ?? "unknown"}
-                      args={p.args ?? {}}
-                      onApprove={() => decide("approve", p as ToolApprovalPart)}
-                      onDecline={() => decide("decline", p as ToolApprovalPart)}
-                      onApproveAll={(pat) => decide("approve", p as ToolApprovalPart, pat)}
+                      tier={approvalPart.tier ?? "write_low"}
+                      toolName={approvalPart.toolName ?? "unknown"}
+                      args={approvalPart.args ?? {}}
+                      onApprove={() => decide("approve", approvalPart)}
+                      onDecline={() => decide("decline", approvalPart)}
+                      onApproveAll={(pat) => decide("approve", approvalPart, pat)}
                     />
-                  ) : null,
-                )}
+                  );
+                })}
               </div>
             </div>
           );
@@ -211,10 +251,10 @@ export function ChatPanel() {
           {toast}
         </div>
       )}
-      <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8 }}>
+      <form onSubmit={onFormSubmit} style={{ display: "flex", gap: 8 }}>
         <input
           value={input}
-          onChange={handleInputChange}
+          onChange={(e) => setInput(e.target.value)}
           placeholder="hello / create a note / apply migrations"
           style={{
             flex: 1,

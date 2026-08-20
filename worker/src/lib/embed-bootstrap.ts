@@ -1,4 +1,8 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+
+loadEnv();                              // .env
+loadEnv({ path: ".env.local" });        // .env.local wins
+
 import { spawn } from "node:child_process";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -21,6 +25,6 @@ export async function maybeRefreshEmbeddings(): Promise<void> {
   if (n > 0 && !stale) return;
 
   console.log(`embed-bootstrap: refreshing (n=${n}, stale=${stale})`);
-  const child = spawn("pnpm", ["embed:tools"], { detached: true, stdio: "inherit" });
+  const child = spawn("pnpm", ["embed:tools"], { detached: true, stdio: "inherit", shell: true });
   child.unref();
 }

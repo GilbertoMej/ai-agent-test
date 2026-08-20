@@ -1,4 +1,8 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+
+loadEnv();                              // .env
+loadEnv({ path: ".env.local" });        // .env.local wins
+
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { MCPClient } from "@mastra/mcp";

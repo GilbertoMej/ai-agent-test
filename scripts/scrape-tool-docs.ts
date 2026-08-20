@@ -1,4 +1,8 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+
+loadEnv();                              // .env
+loadEnv({ path: ".env.local" });        // .env.local wins
+
 import { db } from "@/db/client";
 import { toolDocs } from "@/db/schema";
 import { nanoid } from "nanoid";

@@ -5,7 +5,9 @@ import { createNoteTool } from "../tools/create-note";
 import { applyMigrationsTool } from "../tools/apply-migrations";
 import { resolveApproval, loadActiveGrants, type ApprovalMode } from "../lib/approval";
 
-// D-02: Nemotron 3 Ultra free via OpenRouter. 1M context, 65K output, tool calling supported.
+// D-02: OpenCode Zen Go provider. Iterated from Nemotron 3 Ultra (premature stream close)
+// → GLM 5.2 (rate-limited) → Poolside Laguna S 2.1 (also prematurely closed). OpenCode Go
+// is the current stable choice; see https://mastra.ai/models/providers/opencode-go.
 // D-21 (research): `maxSteps: 4-6` keeps free-tier tool-call degradation from derailing long runs.
 // Mastra 1.60: the `gateway` field was removed from the model config object; pass a
 // `provider/model` string and Mastra auto-routes via the provider registry.
@@ -18,7 +20,7 @@ export const sdlcAgent = new Agent({
     "You are the SDLC Playground agent. For Phase 1 (Walking Skeleton), you have echo (read), " +
     "createNote (write_low), and applyMigrations (write_high). Use createNote when the user asks for a note; " +
     "use applyMigrations when the user asks to migrate. For everything else, answer from chat.",
-  model: "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+  model: "opencode-go/hy3",
   tools: { echoTool, createNoteTool, applyMigrationsTool },
 });
 

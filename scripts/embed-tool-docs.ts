@@ -1,4 +1,8 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+
+loadEnv();                              // .env
+loadEnv({ path: ".env.local" });        // .env.local wins
+
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { embed } from "@/worker/src/lib/rag";
