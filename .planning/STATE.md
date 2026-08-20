@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: Completed 01-M-PLAN.md — gap closure (neutralized applyMigrations description + derived tier from classify())
-last_updated: "2026-08-20T23:46:40.339Z"
+stopped_at: Completed 01-P-PLAN.md — gap closure (CostCounter ticks from data-usage chunks + messageMetadata.modelId)
+last_updated: "2026-08-20T23:56:00.000Z"
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 19
-  completed_plans: 13
-current_plan: L
+  completed_plans: 14
+current_plan: P
 total_plans: 19
 ---
 
@@ -64,6 +64,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 01 P01-K | 120 | 1 tasks | 2 files |
 | Phase 01 PL | 5 | 1 tasks | 1 files |
 | Phase 01 PM | 3 | 2 tasks | 2 files |
+| Phase 01 PP | 5 | 3 tasks | 4 files |
 
 ## Decisions Log (from executed plans)
 
@@ -91,6 +92,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-20 | Pre-existing: audit.test.ts 1/5 fails on `redactString` regex (api_key= separator); NOT introduced by 01-F — track for post-Phase-1 cleanup | 01-F carryover |
 | 2026-08-20 | Pre-existing: tsc reports 14 errors in ChatPanel.tsx / lib/insforge.ts / pause.ts / resume.ts; NOT introduced by 01-F — track for post-Phase-1 cleanup | 01-F carryover |
 | 2026-08-20 | G-1-4 closed: StagePicker native HTML title= replaced with React state hover tooltip (sub-100 ms latency); click toast path preserved; no new deps | 01-L |
+| 2026-08-20 | G-1-10 closed: CostCounter wires modelId via worker SSE start.messageMetadata + reads tokens from data-usage DataUIMessageChunk (real AI SDK v5 wire field); estimateCostUsd guarded against missing pricing keys | 01-P |
 
 ## Accumulated Context
 
@@ -127,7 +129,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-M-PLAN.md — gap closure (neutralized applyMigrations description + derived tier from classify())
+**Stopped at:** Completed 01-P-PLAN.md — gap closure (CostCounter ticks from data-usage chunks + messageMetadata.modelId)
 **Resume file:** None
 
 **Last session:** 2026-08-20T23:46:40.316Z

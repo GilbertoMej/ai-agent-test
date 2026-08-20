@@ -50,7 +50,7 @@
 - [x] 01-M-PLAN.md
 - [ ] 01-N-PLAN.md
 - [ ] 01-O-PLAN.md
-- [ ] 01-P-PLAN.md
+- [x] 01-P-PLAN.md
 - [ ] 01-Q-PLAN.md
 - [ ] 01-R-PLAN.md
 - [ ] 01-S-PLAN.md
