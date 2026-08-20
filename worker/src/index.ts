@@ -1,4 +1,8 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+
+loadEnv();                              // .env
+loadEnv({ path: ".env.local" });        // .env.local wins
+
 import { Mastra } from "@mastra/core";
 import { RequestContext } from "@mastra/core/request-context";
 import { PostgresStore } from "@mastra/pg";
@@ -11,6 +15,9 @@ import { registerApprovalRoutes, getApprovalHandlers } from "./lib/approval-rout
 import type { ApprovalPayload } from "./lib/approval-route";
 import { pauseRoute } from "./api-routes/pause";
 import { resumeRoute, suspendedListRoute } from "./api-routes/resume";
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { MastraServer } from "@mastra/hono";
 
 // D-05: local-only worker. Boots in <2s with no MCPs loaded (D-06).
 // D-22: Next.js sends `Authorization: Bearer ${WORKER_SHARED_SECRET}` on every call.
@@ -145,8 +152,12 @@ registerApprovalRoutes(mastra);
 // Boot-time embed refresh (D-20). Fire-and-forget; non-blocking.
 void maybeRefreshEmbeddings();
 
-export { sdlcAgent, toolApprovalResolver };
+// 01-F1 — Hono + MastraServer wires the apiRoutes registered above onto a real HTTP
+// listener. Mastra 1.60 stores server config on `this.#server` but does NOT auto-listen,
+// so without this block the worker process exits silently and :4111 is unbound.
+const app = new Hono();
+const server = new MastraServer({ app, mastra });
+await server.init();
+serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => console.log(`worker: listening on :${info.port}`));
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log(`worker: listening on :${port}`);
-}
+export { sdlcAgent, toolApprovalResolver };

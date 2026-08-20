@@ -14,12 +14,18 @@ importers:
       '@ai-sdk/react':
         specifier: 2.0.0
         version: 2.0.0(react@19.2.0)(zod@4.4.3)
+      '@hono/node-server':
+        specifier: 2.1.1
+        version: 2.1.1(hono@4.13.3)
       '@insforge/sdk':
         specifier: 1.5.2
         version: 1.5.2(supports-color@10.2.2)
       '@mastra/core':
         specifier: 1.60.0
         version: 1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3)
+      '@mastra/hono':
+        specifier: 1.7.0
+        version: 1.7.0(@hono/node-server@2.1.1(hono@4.13.3))(@mastra/core@1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3))(hono@4.13.3)(zod@4.4.3)
       '@mastra/mcp':
         specifier: 1.17.0
         version: 1.17.0(@mastra/core@1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(hono@4.13.3)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(supports-color@10.2.2)(zod@4.4.3)
@@ -35,6 +41,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.0)(pg@8.23.0)(postgres@3.4.9)
+      hono:
+        specifier: 4.13.3
+        version: 4.13.3
       nanoid:
         specifier: 5.0.9
         version: 5.0.9
@@ -665,6 +674,13 @@ packages:
     peerDependencies:
       hono: ^4
 
+  '@hono/node-ws@1.3.1':
+    resolution: {integrity: sha512-vo/MwCnpJAVHBkGzWjCJ28wF45fYHAfbPZcH2rodZODHtch2GHA94KtMfusmVycTUtsLAsaNsHhtY6P8X3RQsA==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      '@hono/node-server': ^1.19.11
+      hono: ^4.6.0
+
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
     engines: {node: '>=18'}
@@ -852,6 +868,13 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
+  '@mastra/hono@1.7.0':
+    resolution: {integrity: sha512-VE/HPu83Vv+TG91caoJzx8Li5Kazgc6VHA4QFF+2AQbl8/iMiDplsDTRPu8SB48LE6dmOKpJSmq9HsA1GLuMBQ==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      '@mastra/core': '>=1.50.0-0 <2.0.0-0'
+      hono: ^4.12.8
+
   '@mastra/mcp@1.17.0':
     resolution: {integrity: sha512-AiJZzLI3FYASAjXGN1ZYkNocuUC8eIGJj8ysfOKv2UaeFxOp7DBVDANqlfnvMnhHmpgH9NBpPdisp/1niRBNTA==}
     engines: {node: '>=22.13.0'}
@@ -874,6 +897,13 @@ packages:
     resolution: {integrity: sha512-06WfY+j9rulYnDp8CM7pL7JIyrntkMolqmyyb1VJNEzlYTQCIcJcY0SwQiubZv2tztmoYGikszDiRVyXp0E9gA==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@mastra/server@1.60.0':
+    resolution: {integrity: sha512-L3H6Bw+JdWA76zFpW9XOErYMWLKfr/l2p7nxBDVBxQ59fF91Fcg+AopktgHXxxg5dKqZoo2bH5NiM7ZPBaPPaQ==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      '@mastra/core': '>=1.50.0-0 <2.0.0-0'
       zod: ^3.25.0 || ^4.0.0
 
   '@modelcontextprotocol/client@2.0.0':
@@ -1494,6 +1524,9 @@ packages:
 
   fastq@1.20.1:
     resolution: {integrity: sha512-GGToxJ/w1x32s/D2EKND7kTil4n8OVk/9mycTc4VDza13lOvpUZTGX3mFSCtV9ksdGBVzvsyAVLM6mHFThxXxw==}
+
+  fetch-to-node@2.1.0:
+    resolution: {integrity: sha512-Wq05j6LE1GrWpT2t1YbCkyFY6xKRJq3hx/oRJdWEJpZlik3g25MmdJS6RFm49iiMJw6zpZuBOrgihOgy2jGyAA==}
 
   figures@6.1.0:
     resolution: {integrity: sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==}
@@ -2762,6 +2795,15 @@ snapshots:
     dependencies:
       hono: 4.13.3
 
+  '@hono/node-ws@1.3.1(@hono/node-server@2.1.1(hono@4.13.3))(hono@4.13.3)':
+    dependencies:
+      '@hono/node-server': 2.1.1(hono@4.13.3)
+      hono: 4.13.3
+      ws: 8.21.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@img/colour@1.1.0':
     optional: true
 
@@ -2937,6 +2979,20 @@ snapshots:
       - utf-8-validate
       - workflow
 
+  '@mastra/hono@1.7.0(@hono/node-server@2.1.1(hono@4.13.3))(@mastra/core@1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3))(hono@4.13.3)(zod@4.4.3)':
+    dependencies:
+      '@hono/node-ws': 1.3.1(@hono/node-server@2.1.1(hono@4.13.3))(hono@4.13.3)
+      '@mastra/core': 1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3)
+      '@mastra/server': 1.60.0(@mastra/core@1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3))(zod@4.4.3)
+      fetch-to-node: 2.1.0
+      hono: 4.13.3
+      ws: 8.21.3
+    transitivePeerDependencies:
+      - '@hono/node-server'
+      - bufferutil
+      - utf-8-validate
+      - zod
+
   '@mastra/mcp@1.17.0(@mastra/core@1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(hono@4.13.3)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(supports-color@10.2.2)(zod@4.4.3)':
     dependencies:
       '@mastra/core': 1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3)
@@ -2987,6 +3043,12 @@ snapshots:
       json-schema-to-zod: 2.8.1
       zod: 4.4.3
       zod-from-json-schema: 0.5.6
+
+  '@mastra/server@1.60.0(@mastra/core@1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3))(zod@4.4.3)':
+    dependencies:
+      '@mastra/core': 1.60.0(ai@7.0.68(zod@4.4.3))(express@5.2.1(supports-color@10.2.2))(rxjs@7.8.2)(supports-color@10.2.2)(zod@4.4.3)
+      hono: 4.13.3
+      zod: 4.4.3
 
   '@modelcontextprotocol/client@2.0.0':
     dependencies:
@@ -3572,6 +3634,8 @@ snapshots:
   fastq@1.20.1:
     dependencies:
       reusify: 1.1.0
+
+  fetch-to-node@2.1.0: {}
 
   figures@6.1.0:
     dependencies:
