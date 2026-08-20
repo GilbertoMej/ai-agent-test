@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx scripts/predev.ts && concurrently -k -n web,worker -c blue,magenta \"next dev -p 3000\" \"tsx watch worker/src/index.ts\"",
+    "dev": "tsx scripts/predev.ts && concurrently -n web,worker -c blue,magenta \"next dev -p 3000\" \"tsx watch worker/src/index.ts\"",
     "worker": "tsx watch worker/src/index.ts",
     "predev": "tsx scripts/predev.ts",
     "build": "next build",
