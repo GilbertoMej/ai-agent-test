@@ -8,9 +8,9 @@ import { useEffect } from "react";
 const SESSION_KEY = "sdlc.playground.session.v1";
 
 // Use sendBeacon for fire-and-forget on unload; fetch may be cancelled by the browser.
-function beaconPause(sessionId: string): void {
+function beaconPause(sessionId: string, messages: unknown[]): void {
   try {
-    const blob = new Blob([JSON.stringify({ sessionId })], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ sessionId, messages })], { type: "application/json" });
     navigator.sendBeacon?.("/api/pause", blob);
   } catch {
     /* ignore */
@@ -36,12 +36,12 @@ export function saveSessionId(sessionId: string): void {
 }
 
 // Hook — call once from a top-level component. Wires beforeunload + visibilitychange.
-export function usePauseOnUnload(sessionId: string): void {
+export function usePauseOnUnload(sessionId: string, messages: unknown[]): void {
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onBeforeUnload = () => beaconPause(sessionId);
+    const onBeforeUnload = () => beaconPause(sessionId, messages);
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") beaconPause(sessionId);
+      if (document.visibilityState === "hidden") beaconPause(sessionId, messages);
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("visibilitychange", onVisibility);
@@ -49,5 +49,5 @@ export function usePauseOnUnload(sessionId: string): void {
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [sessionId]);
+  }, [sessionId, messages]);
 }

@@ -13,7 +13,7 @@ import { patchTokens } from "./lib/audit";
 import { maybeRefreshEmbeddings } from "./lib/embed-bootstrap";
 import { registerApprovalRoutes, getApprovalHandlers } from "./lib/approval-route";
 import type { ApprovalPayload } from "./lib/approval-route";
-import { pauseRoute } from "./api-routes/pause";
+import { pauseRoute, getSuspendedMessages } from "./api-routes/pause";
 import { resumeRoute, suspendedListRoute } from "./api-routes/resume";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
@@ -44,6 +44,15 @@ export const mastra = new Mastra({
       pauseRoute,
       resumeRoute,
       suspendedListRoute,
+      // 01-Q — GET /sessions/:id/messages — read suspended messages for resume.
+      registerApiRoute("/sessions/:id/messages", {
+        method: "GET",
+        handler: async (c) => {
+          const sessionId = c.req.param("id") ?? "anon";
+          const messages = getSuspendedMessages(sessionId) ?? [];
+          return c.json({ sessionId, messages });
+        },
+      }),
       // 01-04 + 01-11 — approval/decline endpoints. Bearer auth via WORKER_SHARED_SECRET
       // is enforced by the Next.js routes; the worker trusts the call.
       registerApiRoute("/approval/approve", {
