@@ -31,6 +31,7 @@ export function StagePicker({
 }) {
   const [active, setActive] = useState<string>("foundation");
   const [toast, setToast] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<{ id: string; text: string } | null>(null);
 
   const pick = async (id: string, enabled: boolean, phase: number) => {
     if (!enabled) {
@@ -69,7 +70,15 @@ export function StagePicker({
         return (
           <button
             key={s.id}
-            title={s.enabled ? s.label : `Available in Phase ${s.phase}`}
+            onMouseEnter={() =>
+              setHovered({
+                id: s.id,
+                text: s.enabled ? s.label : `Available in Phase ${s.phase}`,
+              })
+            }
+            onMouseLeave={() =>
+              setHovered((h) => (h?.id === s.id ? null : h))
+            }
             onClick={() => pick(s.id, s.enabled, s.phase)}
             style={{
               textAlign: "left",
@@ -86,6 +95,19 @@ export function StagePicker({
           </button>
         );
       })}
+      {hovered && (
+        <span
+          role="tooltip"
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: "#ffcc00",
+            fontFamily: "monospace",
+          }}
+        >
+          {hovered.text}
+        </span>
+      )}
       {toast && (
         <span
           role="status"
