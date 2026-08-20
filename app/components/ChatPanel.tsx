@@ -9,6 +9,7 @@ import { CostCounter } from "./CostCounter";
 import { ActionFeed, type FeedPart } from "./ActionFeed";
 import { usePauseOnUnload, loadSessionId, saveSessionId } from "@/app/lib/pause-signal";
 import type { ApprovalMode } from "@/worker/src/lib/approval";
+import { classify, type ToolClass } from "@/worker/src/lib/classify";
 
 // Vercel AI SDK `useChat`. Streams from /api/chat -> worker SSE.
 // 01-04 / 01-11 — inline ApprovalCard for write_low + write_high tool calls
@@ -211,12 +212,14 @@ export function ChatPanel() {
                   const ap = p as unknown as ApprovalRequestPart;
                   const toolPart = lookupToolPart(parts, ap.toolCallId);
                   const toolName = (toolPart?.toolName) ?? (toolPart?.type?.startsWith("tool-") ? toolPart.type.slice("tool-".length) : "unknown");
+                  const toolClass: ToolClass = toolName ? classify(toolName) : "write_low";
+                  const approvalTier: ToolApprovalPart["tier"] = toolClass === "write_high" ? "write_high" : "write_low";
                   const approvalPart: ToolApprovalPart = {
                     type: "tool-approval-request",
                     toolCallId: ap.toolCallId,
                     toolName,
                     args: toolPart?.input ?? {},
-                    tier: "write_low",
+                    tier: approvalTier,
                   };
                   return (
                     <ApprovalCard
