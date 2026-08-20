@@ -149,15 +149,27 @@ export const mastra = new Mastra({
 // Register the approval handlers so the routes above can find them.
 registerApprovalRoutes(mastra);
 
+// Re-export for downstream tools (test scripts, etc.). Hoisted before the async IIFE
+// because CJS named-export hoisting under esbuild is finicky around top-level async
+// boundaries; placing exports after the IIFE can yield `ReferenceError: ... is not defined`
+// when downstream tools import the worker module.
+export { sdlcAgent, toolApprovalResolver };
+
 // Boot-time embed refresh (D-20). Fire-and-forget; non-blocking.
 void maybeRefreshEmbeddings();
 
-// 01-F1 — Hono + MastraServer wires the apiRoutes registered above onto a real HTTP
-// listener. Mastra 1.60 stores server config on `this.#server` but does NOT auto-listen,
-// so without this block the worker process exits silently and :4111 is unbound.
-const app = new Hono();
-const server = new MastraServer({ app, mastra });
-await server.init();
-serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => console.log(`worker: listening on :${info.port}`));
-
-export { sdlcAgent, toolApprovalResolver };
+// 01-G1 — top-level await is invalid under CJS (tsc/tsx emit CJS because package.json
+// has no "type": "module"). Wrap the wiring in an async IIFE so the await lives inside
+// an async function. The IIFE returns void; we deliberately do not `await` it from the
+// module top-level (same constraint). The IIFE runs synchronously up to the first `await`,
+// then yields to the microtask queue and resolves. The rest of the module finishes loading
+// before `serve(...)` binds, which is the intended behavior.
+void (async () => {
+  // 01-F1 — Hono + MastraServer wires the apiRoutes registered above onto a real HTTP
+  // listener. Mastra 1.60 stores server config on `this.#server` but does NOT auto-listen,
+  // so without this block the worker process exits silently and :4111 is unbound.
+  const app = new Hono();
+  const server = new MastraServer({ app, mastra });
+  await server.init();
+  serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => console.log(`worker: listening on :${info.port}`));
+})();
