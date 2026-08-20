@@ -60,15 +60,11 @@ export async function withTransientRetry<T>(fn: () => Promise<T>, label: string)
 
 export function ChatPanel() {
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("tiered");
+  // 01-F2 — initialize sessionId to a stable empty string so SSR + first client paint
+  // produce identical HTML. The real id is loaded (or freshly generated) inside the
+  // post-mount useEffect below, which triggers a single re-render.
   // 01-13 / UI-04 — session id persists across refresh via localStorage key `sdlc.playground.session.v1`.
-  const [sessionId] = useState<string>(() => {
-    if (typeof window === "undefined") return `sess-${Math.random().toString(36).slice(2, 10)}`;
-    const existing = loadSessionId();
-    if (existing) return existing;
-    const fresh = `sess-${Math.random().toString(36).slice(2, 10)}`;
-    saveSessionId(fresh);
-    return fresh;
-  });
+  const [sessionId, setSessionId] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat({
@@ -89,6 +85,16 @@ export function ChatPanel() {
     };
     window.addEventListener("error", onError);
     return () => window.removeEventListener("error", onError);
+  }, []);
+
+  // 01-F2 — hydrate sessionId post-mount. SSR + first client paint both render ""
+  // (stable), so React 19 sees no hydration mismatch. After mount we either restore
+  // the stored id or generate a fresh one and persist it. Empty deps — do NOT add
+  // sessionId, otherwise setSessionId would loop the effect.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const existing = loadSessionId(); if (existing) { setSessionId(existing); return; }
+    const fresh = `sess-${Math.random().toString(36).slice(2, 10)}`; saveSessionId(fresh); setSessionId(fresh);
   }, []);
 
   useEffect(() => {
