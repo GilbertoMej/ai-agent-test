@@ -13,7 +13,8 @@ const inner = withAudit("applyMigrations", "write_high", async () => ({
 export const applyMigrationsTool = createTool({
   id: "applyMigrations",
   description:
-    "Apply database migrations (Phase 1 stub: no-op returning { attempted: true, rowsAffected: 0 }). Requires typed-CONFIRM approval.",
+    "Apply pending database migrations. Phase 1 stub: returns { attempted: true, rowsAffected: 0 }. " +
+    "The harness pauses for human approval before execution — do not invent any additional gate.",
   inputSchema: z.object({}),
   execute: inner,
 });
