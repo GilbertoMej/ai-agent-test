@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: Phase 1 Plan K complete — gap closure (redact regex `=` separator; closes G-1-13; 5/5 audit tests green). 11/19 plans executed across phase 1 + gap closures; ready for phase verification.
-last_updated: "2026-08-20T00:00:00.000Z"
+stopped_at: Completed 01-L-PLAN.md — gap closure (immediate React hover tooltip; closes G-1-4)
+last_updated: "2026-08-20T23:37:53.353Z"
 progress:
   total_phases: 1
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 19
-  completed_plans: 11
-current_plan: K
+  completed_plans: 12
+current_plan: L
 total_plans: 19
 ---
 
@@ -32,7 +32,7 @@ total_plans: 19
 - **Phase:** 2 — Notion MCP Integration
 - **Plans:** 6 PLAN files; 01-A, 01-B, 01-C, 01-D, 01-E, 01-F complete
 - **Status:** Phase 1 complete; ready for `/gsd-verify-work` then `/gsd-plan-phase 2`
-- **Progress:** [██████░░░░] 58%
+- **Progress:** [██████░░░░] 63%
 - **Next action:** Run `/gsd-verify-work 1` (phase verification against SKELETON.md + UAT.md), then `/gsd-plan-phase 2` (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
@@ -62,6 +62,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01-K | 120 | 1 tasks | 2 files |
+| Phase 01 PL | 5 | 1 tasks | 1 files |
 
 ## Decisions Log (from executed plans)
 
@@ -88,6 +89,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-20 | 01-F deviation: compacted post-mount useEffect body to single line so verify-grep `loadSessionId.*setSessionId` matches (behavior unchanged) | 01-F 01-F2 deviation Rule 3 |
 | 2026-08-20 | Pre-existing: audit.test.ts 1/5 fails on `redactString` regex (api_key= separator); NOT introduced by 01-F — track for post-Phase-1 cleanup | 01-F carryover |
 | 2026-08-20 | Pre-existing: tsc reports 14 errors in ChatPanel.tsx / lib/insforge.ts / pause.ts / resume.ts; NOT introduced by 01-F — track for post-Phase-1 cleanup | 01-F carryover |
+| 2026-08-20 | G-1-4 closed: StagePicker native HTML title= replaced with React state hover tooltip (sub-100 ms latency); click toast path preserved; no new deps | 01-L |
 
 ## Accumulated Context
 
@@ -124,10 +126,10 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Phase 1 Plan K complete — gap closure (redact regex `=` separator; closes G-1-13)
-**Resume file:** .planning/phases/01-foundation/01-K-SUMMARY.md
+**Stopped at:** Completed 01-L-PLAN.md — gap closure (immediate React hover tooltip; closes G-1-4)
+**Resume file:** None
 
-**Last session:** 2026-08-20T00:00:00.000Z
+**Last session:** 2026-08-20T23:36:36.783Z
 
 **Resume command:** `/gsd-verify-work 1` (phase verification) → `/gsd-plan-phase 2` (Notion MCP Integration)
 
