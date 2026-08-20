@@ -10,6 +10,7 @@ import { ActionFeed, type FeedPart } from "./ActionFeed";
 import { usePauseOnUnload, loadSessionId, saveSessionId } from "@/app/lib/pause-signal";
 import type { ApprovalMode } from "@/worker/src/lib/approval";
 import { classify, type ToolClass } from "@/worker/src/lib/classify";
+import type { ModelId } from "@/lib/pricing";
 
 // Vercel AI SDK `useChat`. Streams from /api/chat -> worker SSE.
 // 01-04 / 01-11 — inline ApprovalCard for write_low + write_high tool calls
@@ -168,7 +169,7 @@ export function ChatPanel() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 12, color: "#8b94a7" }}>Session: {sessionId}</span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <CostCounter messages={messages as unknown as Parameters<typeof CostCounter>[0]["messages"]} />
+          <CostCounter messages={messages as unknown as Parameters<typeof CostCounter>[0]["messages"]} model={((messages.at(-1) as unknown as { metadata?: { modelId?: string } } | undefined)?.metadata?.modelId ?? "opencode-go/hy3") as ModelId} />
           <AutoApproveToggle value={approvalMode} onChange={setApprovalMode} />
         </div>
       </div>
