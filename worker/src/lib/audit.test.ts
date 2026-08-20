@@ -24,8 +24,8 @@ test("redactString traps sk-/pk-/api-/key-/token-/secret-prefixed strings", () =
 
 test("redact leaves short identifiers alone (regex requires 20+ chars)", () => {
   // 19-char suffix must not match — protects e.g. enum names that look prefix-shaped.
-  const out = redactString("token=short_value_123456789");
-  assert.equal(out, "token=short_value_123456789");
+  const out = redactString("token=short_value_1234567");
+  assert.equal(out, "token=short_value_1234567");
 });
 
 test("redact is case-insensitive", () => {
