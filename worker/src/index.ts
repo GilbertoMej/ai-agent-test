@@ -119,7 +119,7 @@ export const mastra = new Mastra({
               let textCount = 0;
               try {
                 controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ type: "start", messageId: msgId })}\n\n`),
+                  encoder.encode(`data: ${JSON.stringify({ type: "start", messageId: msgId, messageMetadata: { modelId: "opencode-go/hy3" } })}\n\n`),
                 );
                 for await (const chunk of stream.fullStream) {
                   if (chunk.type === "text-start") {
@@ -165,12 +165,15 @@ export const mastra = new Mastra({
                     const payload = chunk.payload as { totalUsage?: { inputTokens?: number; outputTokens?: number } } | undefined;
                     const usage = payload?.totalUsage;
                     if (usage) {
-                      void patchTokens(
-                        sessionId ?? "anon",
-                        lastToolName,
-                        usage.inputTokens ?? 0,
-                        usage.outputTokens ?? 0,
-                      ).catch(() => {});
+                      const inTok = usage.inputTokens ?? 0;
+                      const outTok = usage.outputTokens ?? 0;
+                      // Server-side audit (BCK-03) — patch the most recent row.
+                      void patchTokens(sessionId ?? "anon", lastToolName, inTok, outTok).catch(() => {});
+                      // Client-side wire (UI-06) — data-usage DataUIMessageChunk lands on m.parts[i].data,
+                      // NOT m.usage (which doesn't exist on UIMessage). The Counter reads from parts.
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ type: "data-usage", data: { inputTokens: inTok, outputTokens: outTok, totalTokens: inTok + outTok } })}\n\n`),
+                      );
                     }
                   }
                 }
