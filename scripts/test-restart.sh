@@ -10,7 +10,7 @@ WORKER_URL="${WORKER_URL:-http://localhost:4111}"
 PORT="${WORKER_PORT:-4111}"
 
 echo "test-restart: precheck — worker reachable"
-curl -fsS -H "Authorization: Bearer ${WORKER_SHARED_SECRET}" "${WORKER_URL}/api/health" >/dev/null
+curl -fsS -H "Authorization: Bearer ${WORKER_SHARED_SECRET}" "${WORKER_URL}/health" >/dev/null
 
 echo "test-restart: snapshot count before kill"
 BEFORE="$(psql "${DATABASE_URL}" -tAc "SELECT count(*) FROM mastra_snapshots")"
@@ -28,7 +28,7 @@ fi
 # Wait up to 5s for tsx watch to respawn the worker on :$PORT.
 for i in 1 2 3 4 5; do
   sleep 1
-  if curl -fsS -H "Authorization: Bearer ${WORKER_SHARED_SECRET}" "${WORKER_URL}/api/health" >/dev/null 2>&1; then
+  if curl -fsS -H "Authorization: Bearer ${WORKER_SHARED_SECRET}" "${WORKER_URL}/health" >/dev/null 2>&1; then
     echo "test-restart: worker back up after ${i}s"
     break
   fi

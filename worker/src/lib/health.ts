@@ -1,11 +1,11 @@
 import { registerApiRoute } from "@mastra/core/server";
 import { probeAll } from "../mcp/health-probe";
 
-// /api/health — UI-07 banner + smoke assertion.
+// /health — internal worker route. Next.js proxies this to the browser (UI-07 banner + smoke).
 // Per-server status comes from the lifecycle probe, not env-var presence (01-02b).
 // 01-07 — explicit token presence + uptime_s so the banner can flip red when the worker stops.
 // ponytail: tokens read at request time, not cached — single env-var check is cheaper than a Map.
-export const healthRoute = registerApiRoute("/api/health", {
+export const healthRoute = registerApiRoute("/health", {
   method: "GET",
   handler: async (c) => {
     const mastra = c.get("mastra");

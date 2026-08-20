@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-// Proxy to worker /api/health with the shared secret. Returns the JSON body verbatim.
+// Proxy to worker /health with the shared secret. Returns the JSON body verbatim.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -9,7 +9,7 @@ export async function GET() {
   const secret = process.env.WORKER_SHARED_SECRET;
 
   try {
-    const r = await fetch(`${workerUrl}/api/health`, {
+    const r = await fetch(`${workerUrl}/health`, {
       headers: { Authorization: `Bearer ${secret}` },
       cache: "no-store",
     });

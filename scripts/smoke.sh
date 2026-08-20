@@ -30,7 +30,7 @@ echo "smoke: layer-1 OK"
 # Layer-2 runtime assertions (01-01b-runtime).
 
 # 5. Worker reachable + worker_up: true.
-WORKER_HEALTH="$(curl -fsS -H "Authorization: Bearer ${WORKER_SHARED_SECRET}" "${WORKER_URL}/api/health")"
+WORKER_HEALTH="$(curl -fsS -H "Authorization: Bearer ${WORKER_SHARED_SECRET}" "${WORKER_URL}/health")"
 test "$(echo "${WORKER_HEALTH}" | jq -r .worker_up)" = "true"
 
 # 6. Per-server MCP lifecycle state present (notion/linear/playwright/sentry).
