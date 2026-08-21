@@ -81,28 +81,27 @@ export function ChatPanel() {
   const [sessionId, setSessionId] = useState<string>("");
   const [input, setInput] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
-  // 01-Q — seed useChat with messages fetched from the worker on mount.
-  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
 
   // Ref mirror of `messages` so usePauseOnUnload sees the latest array at unload time.
   const messagesRef = useRef<UIMessage[]>([]);
 
-  // AI SDK v5 useChat: sendMessage + status. body is passed via DefaultChatTransport
-  // (useChat v4's top-level `body` option was removed in v5).
-  // ponytail: cast — DefaultChatTransport from `ai` and ChatTransport from `@ai-sdk/react`
-  // are structurally identical but nominally distinct (different module identities).
-  const { messages, sendMessage, status } = useChat<UIMessage>({
+  // AI SDK v5 useChat: messages + sendMessage + status + setMessages. body is
+  // passed via DefaultChatTransport (a top-level `body` option was removed in v5).
+  // 01-U — body must be a function so the captured transport re-reads the React
+  // closure on every sendMessage (post-mount setSessionId(fresh) propagates).
+  // 01-V — drop `messages: initialMessages` from the seed prop (the prop is only
+  // honored at first construction; setting it after mount is silently dropped).
+  // Instead, destructure `setMessages` (UseChatHelpers at @ai-sdk/react/dist/index.d.ts:25)
+  // and call it inside the mount-fetch's `.then` handler to push the fetched
+  // snapshot into the hook's internal state. useChat re-renders with the
+  // populated array — no `loaded` gate, no `key={...}` remount, no parent-fetch.
+  // ponytail: cast — DefaultChatTransport from `ai` and ChatTransport from
+  // `@ai-sdk/react` are structurally identical but nominally distinct.
+  const { messages, sendMessage, status, setMessages } = useChat<UIMessage>({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      // ponytail: body must be a function so `resolve()` re-reads the React
-      // closure on every sendMessage. The captured transport on first render
-      // would otherwise hold sessionId="" for the lifetime of the Chat instance
-      // (useRef captures Chat once — see @ai-sdk/react useChat source).
-      // Static object form is captured at construction; only the function form
-      // surfaces post-mount setSessionId(fresh) to the worker.
       body: () => ({ approvalMode, sessionId }),
     }) as never,
-    messages: initialMessages,
   });
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   const isLoading = status === "submitted" || status === "streaming";
@@ -134,24 +133,31 @@ export function ChatPanel() {
   // (stable), so React 19 sees no hydration mismatch. After mount we either restore
   // the stored id or generate a fresh one and persist it. Empty deps — do NOT add
   // sessionId, otherwise setSessionId would loop the effect.
+  // 01-V — setMessages is the only way to seed useChat with messages AFTER mount.
+  // The `messages` prop is the initial seed captured at hook construction;
+  // subsequent prop changes do not update the array. Fetched snapshot is pushed
+  // via setMessages(body.messages) below (UseChatHelpers at
+  // @ai-sdk/react/dist/index.d.ts:25).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const existing = loadSessionId();
     if (existing) {
       setSessionId(existing);
-      // Fetch prior messages for this session; seed useChat's initialMessages.
+      // Fetch prior messages for this session; push them into useChat's
+      // internal messages array via setMessages (the documented API for
+      // mutating messages after hook construction).
       fetch(`/api/messages?sessionId=${encodeURIComponent(existing)}`)
         .then((r) => r.json() as Promise<{ messages?: unknown[] }>)
         .then((body) => {
           if (Array.isArray(body.messages)) {
-            setInitialMessages(body.messages as UIMessage[]);
+            setMessages(body.messages as UIMessage[]);
           }
         })
         .catch(() => { /* no prior messages — keep empty */ });
       return;
     }
     const fresh = `sess-${Math.random().toString(36).slice(2, 10)}`; saveSessionId(fresh); setSessionId(fresh);
-  }, []);
+  }, [setMessages]);
 
   useEffect(() => {
     if (!toast) return;
