@@ -2,7 +2,7 @@
 
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApprovalCard, type ApprovalTier } from "./ApprovalCard";
 import { AutoApproveToggle } from "./AutoApproveToggle";
 import { CostCounter } from "./CostCounter";
@@ -81,6 +81,11 @@ export function ChatPanel() {
   const [sessionId, setSessionId] = useState<string>("");
   const [input, setInput] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
+  // 01-Q — seed useChat with messages fetched from the worker on mount.
+  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+
+  // Ref mirror of `messages` so usePauseOnUnload sees the latest array at unload time.
+  const messagesRef = useRef<UIMessage[]>([]);
 
   // AI SDK v5 useChat: sendMessage + status. body is passed via DefaultChatTransport
   // (useChat v4's top-level `body` option was removed in v5).
@@ -91,7 +96,9 @@ export function ChatPanel() {
       api: "/api/chat",
       body: { approvalMode, sessionId },
     }) as never,
+    messages: initialMessages,
   });
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   const isLoading = status === "submitted" || status === "streaming";
 
   const onFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -104,7 +111,8 @@ export function ChatPanel() {
   const [err, setErr] = useState<string | null>(null);
 
   // 01-13 / D-07 — pause the worker on tab close; SSE reconnect re-emits the same tool-call-approval chunk.
-  usePauseOnUnload(sessionId);
+  // 01-Q — ship the latest messages array so the worker can replay them on resume.
+  usePauseOnUnload(sessionId, messagesRef.current);
 
   useEffect(() => {
     const onError = (e: ErrorEvent) => {
@@ -122,7 +130,20 @@ export function ChatPanel() {
   // sessionId, otherwise setSessionId would loop the effect.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const existing = loadSessionId(); if (existing) { setSessionId(existing); return; }
+    const existing = loadSessionId();
+    if (existing) {
+      setSessionId(existing);
+      // Fetch prior messages for this session; seed useChat's initialMessages.
+      fetch(`/api/messages?sessionId=${encodeURIComponent(existing)}`)
+        .then((r) => r.json() as Promise<{ messages?: unknown[] }>)
+        .then((body) => {
+          if (Array.isArray(body.messages)) {
+            setInitialMessages(body.messages as UIMessage[]);
+          }
+        })
+        .catch(() => { /* no prior messages — keep empty */ });
+      return;
+    }
     const fresh = `sess-${Math.random().toString(36).slice(2, 10)}`; saveSessionId(fresh); setSessionId(fresh);
   }, []);
 
