@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: "Completed 01-R-PLAN.md — gap closure G-1-12 (withAudit sessionId threaded via module-scope; INSERT errors surface via console.error without breaking stream)"
-last_updated: "2026-08-21T00:13:11.019Z"
+stopped_at: Completed 01-S-PLAN.md — gap closure G-1-14 (ragQueryTool imported, registered on sdlcAgent, and instructions extended so the model can retrieve tool docs)
+last_updated: "2026-08-21T00:26:45.000Z"
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 19
-  completed_plans: 16
-current_plan: R
+  completed_plans: 17
+current_plan: S
 total_plans: 19
 ---
 
@@ -32,7 +32,7 @@ total_plans: 19
 - **Phase:** 2 — Notion MCP Integration
 - **Plans:** 6 PLAN files; 01-A, 01-B, 01-C, 01-D, 01-E, 01-F complete
 - **Status:** Phase 1 complete; ready for `/gsd-verify-work` then `/gsd-plan-phase 2`
-- **Progress:** [████████░░] 84%
+- **Progress:** [█████████░] 89%
 - **Next action:** Run `/gsd-verify-work 1` (phase verification against SKELETON.md + UAT.md), then `/gsd-plan-phase 2` (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
@@ -67,6 +67,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 01 PP | 5 | 3 tasks | 4 files |
 | Phase 01 PQ | 6 | 2 tasks | 5 files |
 | Phase 1 PR | 6 | 1 tasks | 2 files |
+| Phase 1 PS | 5 | 1 tasks | 1 files |
 
 ## Decisions Log (from executed plans)
 
@@ -97,6 +98,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-20 | G-1-10 closed: CostCounter wires modelId via worker SSE start.messageMetadata + reads tokens from data-usage DataUIMessageChunk (real AI SDK v5 wire field); estimateCostUsd guarded against missing pricing keys | 01-P |
 | 2026-08-21 | G-1-11 closed: pause/resume persists chat messages — worker SuspendedRun stores messages snapshot, new GET /sessions/:id/messages endpoint, browser beacon sends messages alongside sessionId, ChatPanel fetches /api/messages on mount and seeds useChat (in-memory Map; Phase 8 adds durable persistence) | 01-Q |
 | 2026-08-21 | G-1-12 closed: withAudit threads sessionId via module-scope `currentSessionId` + `setAuditSessionId()` setter (Mastra 1.60 tool runner invokes execute(args) with one arg — ctx never populated); INSERT wrapped in try/catch + console.error; stream route calls setter immediately after body destructure; chat stream does not break on audit failure | 01-R |
+| 2026-08-21 | G-1-14 closed: ragQueryTool imported (worker/src/agents/sdlc.ts:6), registered on sdlcAgent tools object (line 27), and agent instructions extended (lines 22-23) to mirror the tool description's 'Call rag_query BEFORE invoking any MCP tool whose usage you are unsure about' prompt — chat can now trigger tool_docs retrieval; audit_log row will record tool_doc_rows_consumed >= 1 | 01-S |
 
 ## Accumulated Context
 
@@ -133,10 +135,10 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-R-PLAN.md — gap closure G-1-12 (withAudit sessionId threaded via module-scope; INSERT errors surface via console.error without breaking stream)
+**Stopped at:** Completed 01-S-PLAN.md — gap closure G-1-14 (ragQueryTool imported, registered on sdlcAgent, and instructions extended so the model can retrieve tool docs)
 **Resume file:** None
 
-**Last session:** 2026-08-21T00:09:25.000Z
+**Last session:** 2026-08-21T00:25:00.997Z
 
 **Resume command:** `/gsd-verify-work 1` (phase verification) → `/gsd-plan-phase 2` (Notion MCP Integration)
 
