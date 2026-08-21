@@ -1,14 +1,25 @@
 ---
-status: diagnosed
+status: testing
 phase: 01-foundation
 source: 01-A-SUMMARY.md, 01-B-SUMMARY.md, 01-C-SUMMARY.md, 01-D-SUMMARY.md, 01-E-SUMMARY.md, 01-F-SUMMARY.md
 started: 2026-08-19T19:00:00Z
-updated: 2026-08-20T17:55:00Z
+updated: 2026-08-20T18:30:00Z
 ---
 
 ## Current Test
 
 [testing complete]
+
+## Summary
+
+total: 15
+passed: 9
+issues: 6
+pending: 0
+skipped: 0
+blocked: 1
+prior_issues: 10
+reconciled_resolved: 9
 
 ## Tests
 
@@ -26,9 +37,7 @@ result: pass
 
 ### 4. Stage Picker
 expected: Left sidebar shows 9 entries; Foundation enabled, 8 SDLC stages greyed with "Available in Phase X" tooltip on hover
-result: issue
-reported: "Same as prior session — tooltip message doesn't appear on hover. Only on click does 'Available in Phase X' render at the bottom of the sidebar."
-severity: minor
+result: pass
 
 ### 5. Read Tool Runs Silently (no ApprovalCard)
 expected: When agent calls echo or rag_query, no ApprovalCard appears in chat; tool executes and result appears in Action Feed
@@ -38,51 +47,58 @@ note: "echo path verified — no ApprovalCard, Action Feed shows tool lifecycle.
 ### 6. Write-Low Card (createNote)
 expected: When agent calls createNote, inline Approve/Deny card appears with optional "Approve all matching for 5 min"
 result: issue
-reported: "createNoteTool executed and echoed args back: {\"text\":\"test-note: hello world\"}. No ApprovalCard rendered. No Approve/Deny buttons. No 'Approve all matching for 5 min' option. Tool ran as if no approval gate."
+reported: "ApprovalCard never renders. SSE wire shows tool-approval-request chunk emitted with correct approvalId+toolCallId — translator path works. Tool still executes un-gated. ChatPanel ignores tool-approval-request chunks. Also sessionId:'' empty in payload — G-1-12 cross-link."
 severity: major
+gap: G-1-7b (NEW — original G-1-7 was inconclusive between resolver/translator; both work now; failure is ChatPanel renderer)
+note: "Fix plan 01-N added observability only. The actual root cause was downstream: ChatPanel must render the card on the tool-approval-request chunk type. Also empty sessionId in payload likely defeats G-1-12 even with R fix in place."
 
 ### 7. Write-High Card (applyMigrations)
 expected: When agent calls applyMigrations, card shows red border + DESTRUCTIVE badge + typed-CONFIRM input; Approve disabled until user types "CONFIRM"
 result: issue
-reported: "Model did not invoke applyMigrations. Replied with text: 'I can run the migrations via applyMigrations, but per the Phase 1 rules this requires a typed CONFIRM approval before I execute it. Please reply with exactly: CONFIRM...' Model hallucinated a typed-CONFIRM gate that does not exist in the agent instructions (sdlc.ts) or approval code (approval.ts/classify.ts). The tool call never fires, so the ApprovalCard never renders."
-severity: minor
-note: "Model hallucinated a gate. Real fix path: (a) tighten agent instructions to forbid invented gating, (b) or actually wire the write_high card (currently ChatPanel hardcodes tier='write_low' for all approvals — would not show red/CONFIRM even if it fired)."
+reported: "Model DID call the tool this time (01-M fix worked for description). SSE wire shows tool-approval-request emitted. BUT tool still executed (terminal: 'ok text=0 tool=applyMigrationsTool'). Worker logs: [approval-resolver] tool=applyMigrationsTool mode=tiered → [chat-debug] chunk=tool-call-approval → [chat-debug] ok tool=applyMigrationsTool. Chunk is emitted but doesn't pause execution."
+severity: major
+gap: G-1-15 (NEW — gate mechanism doesn't pause in Mastra 1.60; supersedes G-1-7b renderer hypothesis for the actual blocking)
+note: "01-M successfully removed the model-bias in tool description — model called applyMigrations. 01-N observability proved resolver+translator fire. The actual blocking is upstream: Mastra 1.60 emits tool-call-approval chunk then auto-resumes tool execution regardless of resolver return value, because the streaming flow has no way to await a client response. Renderer (G-1-7b) is downstream of this — fixing renderer alone won't gate execution."
 
 ### 8. Auto-Approve Toggle Bypasses Cards
 expected: Header toggle set to "Always" makes all cards disappear for the session; audit rows show approval_decision='auto'
-result: issue
-reported: "Cannot verify the tiered→always contrast. ApprovalCard never renders in tiered mode either (same symptom as G-1-7). Switched toggle to Always and triggered createNote — tool ran, but since it was already running un-gated in tiered, the contrast (cards disappearing) is invisible. No way to confirm the resolver actually consults approvalMode."
-severity: major
-note: "Inherits G-1-7 root cause. Even if cards fired in tiered, the toggle comparison would need a working tiered gate to compare against."
+result: blocked
+blocked_by: other
+reason: "Cannot test tiered→always contrast — tiered card never appears (G-1-15 gate mechanism doesn't pause in Mastra 1.60 streaming). Resolver fix (01-O) cannot be observed from UI without a working tiered gate to compare against. Re-test after G-1-15 resolves."
 
 ### 9. Action Feed Renders Tool Lifecycle Inline
 expected: Tool calls, results, errors, and approval cards all render as bubbles in the feed with status icons
 result: pass
-note: "Tool call + input bubble + result bubble render. Approval-card sub-bullet unverifiable due to G-1-7."
+note: "Re-verified 2026-08-20: tool call bubble + result bubble render in feed. Approval-card sub-bullet still unverifiable (G-1-15 unresolved)."
 
 ### 10. Cost Counter Ticks From Usage
 expected: Header shows running USD estimate; increments after each agent step as tokens_in/out flow in from step-finish chunks
 result: issue
-reported: "Cost counter stays at $0 after agent replies. Two plausible causes: (a) step-finish chunk's totalUsage payload missing/zero; (b) pricing table (lib/pricing.ts) has no entry for opencode-go/hy3 — lookup returns undefined → estimateCostUsd crashes or returns NaN/0."
+reported: "Counter displays '~ $0.0000' but value does not change at all across multiple replies. 01-P made the display not crash (no TypeError) but data-usage chunks either not emitted or not summed by CostCounter."
 severity: minor
+gap: G-1-16 (NEW — 01-P resolved crash but data wire incomplete)
+note: "Possibilities: (a) worker step-finish not actually emitting data-usage chunks; (b) CostCounter not finding data-usage parts in m.parts; (c) opencode-go/hy3 is genuinely free so $0.0000 is correct but stable. Check worker terminal for usage log lines; inspect m.parts in devtools for data-usage entries."
 
 ### 11. Pause on Tab Close
 expected: Closing the tab sends `navigator.sendBeacon` to /api/pause; worker records sessionId in suspendedRuns Map
 result: issue
-reported: "Beacon side works: terminal logs /api/pause POST on tab close. Resume side broken: reopening tab loads same sessionId (localStorage persists) but chat panel is empty, previous messages lost. Either worker doesn't persist messages to suspended_runs, or ChatPanel doesn't fetch prior messages on mount."
+reported: "Beacon fires (POST /api/pause 200). ChatPanel fetches /api/messages on mount (200). BUT chat remains empty after reopen. Either worker doesn't store messages snapshot OR returns empty from suspendedRuns OR ChatPanel doesn't seed useChat from fetch result."
 severity: major
+gap: G-1-11b (NEW — 01-Q shipped GET endpoint + fetch but round-trip incomplete)
+note: "Network path works on both sides (pause 200, messages 200). Three suspects: (a) beacon payload omits messages array; (b) worker suspendedRuns Map key collision / wrong key; (c) ChatPanel receives empty array and discards it; (d) useChat initialMessages not actually setting on hydrate."
 
 ### 12. Audit Log Row Populated
 expected: After smoke echo call, `SELECT * FROM audit_log WHERE session_id=<your-session>` returns 1 row with tokens_in/out NOT NULL, session_id matches browser session id
 result: issue
-reported: "audit_log table on InsForge exists but is empty after echo call. withAudit wrapper either not executing INSERT, or insert is failing silently (likely session_id mismatch — requestContext.sessionId not reaching withAudit, or wrong table/column names)."
+reported: "audit_log still empty after echo call ('No Records Found'). 01-R's module-scope carrier didn't reach INSERT — or INSERT fails and console.error not surfacing."
 severity: blocker
+gap: G-1-12b (NEW — 01-R didn't reach INSERT path)
+note: "Need worker terminal logs to see whether console.error fires (INSERT failure) or whether withAudit execute wrapper isn't even invoked. Check /api/health for worker liveness; check worker terminal during echo call for any audit-related log lines."
 
 ### 13. Audit Log Redacts Secrets
 expected: `pnpm test:audit` exits 0; if a tool call passes args_json with `sk-...` 20+ char strings, the audit row's args_json shows `[REDACTED]` instead
-result: issue
-reported: "pnpm test:audit fails: `redactString traps sk-/pk-/api-/key-/token-/secret-prefixed strings` AssertionError. Failing case: `header api_key=AbCdEfGhIjKlMnOpQrStUvWxYz012345` — 32-char value with underscore separator passes through unredacted. Redactor regex likely matches hyphenated prefixes only (api-key, secret-key) not underscored (api_key, secret_key)."
-severity: blocker
+result: pass
+note: "All 5 tests pass: sk-/pk-/api-/key-/token-/secret-, short identifiers, case-insensitive, JSON stringify, classify. 01-K fix verified."
 
 ### 14. MCP Reconnect Bounded Retry
 expected: If a stdio MCP server kills its pipe, `node --import tsx worker/scripts/test-mcp-reconnect.ts` reconnects within 3 attempts (1s/2s/4s backoff)
@@ -91,184 +107,225 @@ result: pass
 ### 15. RAG Tool Returns Context + Audit Rows Consumed
 expected: Calling rag_query returns a context string; audit_log row has tool_doc_rows_consumed >= 1
 result: issue
-reported: "rag_query tool exists at worker/src/tools/rag-query.ts but is not registered on sdlcAgent — worker/src/agents/sdlc.ts:24 wires only echo/createNote/applyMigrations. Cannot trigger via chat, cannot verify context retrieval or audit row tool_doc_rows_consumed."
+reported: "ragQueryTool is now registered (model calls it) but two failures stack: (1) Resolver fires for read tool — '[approval-resolver] tool=ragQueryTool mode=tiered' should NOT gate read tools, but it does; (2) SSE stream ends after tool-approval-request with no tool-output chunk — '[chat-debug] ok text=8 tool=ragQueryTool' shows tool ran but result never reached client. User sees: 'I'll look up...' text + tool call bubble, but NO context string and NO tool result rendered."
 severity: blocker
+gap: G-1-14b (extends G-1-14 — wiring works, but resolver+stream are wrong for read tools)
+note: "Tool Docs ingested (3 sections, notion/local). Model correctly chose to call rag_query. Two new defects: (a) classify('rag_query')='read' but resolver still gates it — resolver code path may not consult classify output. (b) Even when tool runs, its result is not forwarded as tool-output-available chunk on SSE. Both rooted in G-1-15 gate mechanism. Also: empty sessionId in payload prevents G-1-12b from associating any audit row with browser session."
 
 ## Summary
 
 total: 15
 passed: 6
-issues: 10
-pending: 0
+issues: 0
+pending: 9
 skipped: 0
 blocked: 0
+prior_issues: 10
+reconciled_resolved: 9
 
 ## Gaps
 
+<!-- All 9 failed gaps reconciled 2026-08-20 against executed gap-closure plans K-S. -->
+
 - gap_id: G-1-7
-  truth: "When agent calls createNote, inline Approve/Deny card appears with optional 'Approve all matching for 5 min'"
-  status: failed
-  reason: "User reported: createNoteTool executed and echoed args back. No ApprovalCard rendered. No Approve/Deny buttons. No 'Approve all matching for 5 min' option. Tool ran as if no approval gate."
-  severity: major
-  test: 6
-  root_cause: "INCONCLUSIVE — two candidates. (A) toolApprovalResolver never invoked by Mastra 1.60 (approval gate evaluates to false, tool runs). (B) tool-call-approval chunk IS emitted but chunk translator at worker/src/index.ts:151-156 fails to forward it. Logic in resolveApproval + classify is confirmed correct in isolation (returns 'always' → true → gate). Without runtime logs cannot distinguish A from B. Diagnosis recommends one-line console.log observability hook in toolApprovalResolver + per-chunk logging in the for-await loop."
-  artifacts:
-    - path: "worker/src/agents/sdlc.ts"
-      issue: "Lines 30-36: toolApprovalResolver wiring unverified at runtime; add observability hook"
-    - path: "worker/src/index.ts"
-      issue: "Lines 151-156: tool-call-approval chunk translation needs per-chunk logging"
-    - path: "node_modules/@mastra/core/dist/agent-BVtn9FqD.cjs"
-      issue: "Lines 26036-26307: approval-gate plumbing path to verify"
-  missing:
-    - "Add console.log('[approval-resolver]', toolName, approvalMode) to toolApprovalResolver"
-    - "Add console.log('[chat-debug] chunk=', chunk.type) inside for-await loop"
-    - "Run pnpm dev, send createNote test, observe logs to distinguish A from B"
-    - "Either restore resolver wiring (if A) or correct chunk translation (if B)"
-  debug_session: ".planning/debug/write-low-card-not-shown.md"
+  status: resolved
+  resolved_by: 01-N-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-N added observability hooks ([approval-resolver] in toolApprovalResolver + [chat-debug] per-chunk log)
+    so the operator can see at runtime whether the resolver fires AND whether tool-call-approval chunks reach the SSE
+    translator. Resolution of the underlying chunk-translation bug now visible from logs.
 
 - gap_id: G-1-8
-  truth: "When agent calls applyMigrations, card shows red border + DESTRUCTIVE badge + typed-CONFIRM input; Approve disabled until user types CONFIRM"
-  status: failed
-  reason: "Model did not invoke applyMigrations. Hallucinated a typed-CONFIRM gate that does not exist in agent instructions or approval code. Tool call never fires, so ApprovalCard never renders. Even if it fired, ChatPanel hardcodes tier='write_low' for all approvals — red/CONFIRM check would not surface."
-  severity: minor
-  test: 7
-  root_cause: "TWO independent root causes. (1) apply-migrations.ts:15-16 tool description literally contains 'Requires typed-CONFIRM approval' which biases the model to emit the gate as chat text instead of calling the tool. (2) app/components/ChatPanel.tsx:219 hardcodes tier='write_low' when building ToolApprovalPart — overrides the backend classifier's correct write_high result, so even if the tool fired, ApprovalCard's red border + DESTRUCTIVE + CONFIRM branch (which exists in ApprovalCard.tsx:31,69,84,101-122) would be unreachable."
-  artifacts:
-    - path: "worker/src/tools/apply-migrations.ts"
-      issue: "Lines 15-16: description contains 'Requires typed-CONFIRM approval' — model bias"
-    - path: "app/components/ChatPanel.tsx"
-      issue: "Line 219: tier: 'write_low' hardcoded literal — discards backend classifier"
-  missing:
-    - "Rewrite apply-migrations.ts:15-16 description to neutral language (e.g., 'Apply pending database migrations. The harness pauses for human approval before execution.')"
-    - "Replace ChatPanel.tsx:219 literal with tier derived from classify(toolName) (re-export classify for client) or attach tier to tool-approval-request chunk from worker"
-    - "Optionally tighten sdlc.ts instructions: 'Never invent approval gates — call the tool and let the harness decide'"
-  debug_session: ".planning/debug/g-1-8-apply-migrations-confirm-gate.md"
+  status: resolved
+  resolved_by: 01-M-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-M: rewrote apply-migrations.ts:15-16 description to neutral language (removed the literal
+    'Requires typed-CONFIRM approval' that biased the model); replaced ChatPanel.tsx hardcoded
+    tier='write_low' with classify(toolName) derivation imported directly from worker/src/lib/classify
+    (pure module, safe for client bundle — NOT the audit re-export).
 
 - gap_id: G-1-9
-  truth: "Auto-Approve Toggle set to Always makes all cards disappear for the session"
-  status: failed
-  reason: "Cannot verify contrast — ApprovalCard never renders in tiered mode (G-1-7). Auto-approve path looks identical to broken tiered path. Resolver consult on approvalMode is un-observable from the UI without working tiered gate."
-  severity: major
-  test: 8
-  root_cause: "toolApprovalResolver (sdlc.ts:33) reads approvalMode via TypeScript cast to {approvalMode?: ApprovalMode} then property access (rc.approvalMode). At runtime, ctx.requestContext is the RequestContext class instance with values in a private registry Map — accessed only via .get(key)/.getRaw(key), NOT property access. Cast suppresses type error but doesn't turn class into plain object — rc.approvalMode is always undefined. resolveApproval is always called with approvalMode: undefined, both tiered and always paths fall through to gate. INDEPENDENT of G-1-7 — G-1-9 needs its own fix even after G-1-7 resolves."
-  artifacts:
-    - path: "worker/src/agents/sdlc.ts"
-      issue: "Lines 30-36: rc.approvalMode property access on RequestContext class instance always returns undefined; needs requestContext.getRaw('approvalMode')"
-  missing:
-    - "Replace `const rc = (ctx.requestContext ?? {}) as { approvalMode?: ApprovalMode }` with `const approvalMode = ctx.requestContext?.getRaw?.('approvalMode') as ApprovalMode | undefined`"
-    - "Pass approvalMode directly into resolveApproval"
-  debug_session: ".planning/debug/g-1-9-toggle-resolver.md"
+  status: resolved
+  resolved_by: 01-O-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-O: replaced property access `rc.approvalMode` (always undefined on RequestContext class instance)
+    with `rc.getRaw?.('approvalMode') ?? rc.approvalMode ?? undefined` chain in toolApprovalResolver.
 
 - gap_id: G-1-10
-  truth: "Cost counter increments after each agent step as tokens flow in from step-finish chunks"
-  status: failed
-  reason: "Cost counter stays at $0. Likely lib/pricing.ts has no entry for opencode-go/hy3 — current model after G-1-6 switch."
-  severity: minor
-  test: 10
-  root_cause: "THREE defects stack. (1) lib/pricing.ts:3 ModelId union excludes opencode-go/hy3; estimateCostUsd throws TypeError (NOT NaN) on missing key. (2) CostCounter.tsx:22 hardcodes default model='nemotron-3-ultra-free' with $0 pricing; reads non-existent m.usage instead of m.parts data-usage. ChatPanel.tsx:170 doesn't pass model prop. (3) Worker index.ts:164-175 step-finish branch only patches audit, emits zero usage chunks to SSE — designed-out per ui-message-chunk-translation memory note, not a forgotten handler. AI SDK v5 UIMessage has no usage field; wire carrier is DataUIMessageChunk of type 'data-usage' on m.parts[i].data. 01-D-SUMMARY and 01-VERIFICATION factually wrong about m.usage wire contract."
-  artifacts:
-    - path: "lib/pricing.ts"
-      issue: "Line 3 ModelId union missing opencode-go/hy3; no runtime guard against missing key"
-    - path: "app/components/CostCounter.tsx"
-      issue: "Line 22 default model='nemotron-3-ultra-free'; reads wrong m.usage instead of m.parts data-usage"
-    - path: "app/components/ChatPanel.tsx"
-      issue: "Line 170: doesn't pass model or metadata to CostCounter"
-    - path: "worker/src/index.ts"
-      issue: "Lines 164-175: step-finish only patches audit, no SSE usage chunk"
-    - path: ".planning/phases/01-foundation/01-D-SUMMARY.md"
-      issue: "Line 185: asserts m.usage wire behavior that doesn't exist"
-    - path: ".planning/phases/01-foundation/01-VERIFICATION.md"
-      issue: "Line 108: same factually-wrong wire-contract claim"
-  missing:
-    - "Add opencode-go/hy3 row to PRICING + extend ModelId union"
-    - "Guard estimateCostUsd against missing key (return 0 + warn)"
-    - "Surface active modelId to client via start chunk messageMetadata"
-    - "Emit step-finish usage via data-usage DataUIMessageChunk"
-    - "Update CostCounter to read m.parts[i].data for data-usage instead of m.usage"
-    - "Correct 01-D-SUMMARY:185 + 01-VERIFICATION:108 to reference ui-message-chunk-translation memory note"
-  debug_session: ".planning/debug/g-1-10-cost-counter-zero.md"
+  status: resolved
+  resolved_by: 01-P-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-P: extended lib/pricing.ts ModelId union with opencode-go/hy3 + added guard against missing keys.
+    Worker step-finish branch now emits a `data-usage` DataUIMessageChunk with {inputTokens, outputTokens, totalTokens}.
+    Start chunk emits messageMetadata { modelId } so the client can price. CostCounter reads m.parts[i].data
+    data-usage instead of non-existent m.usage.
 
 - gap_id: G-1-11
-  truth: "Closing tab sends beacon to /api/pause and worker records session; reopen resumes cleanly with prior messages"
-  status: failed
-  reason: "Beacon fires (terminal logs /api/pause POST). Reopening tab restores sessionId via localStorage but chat is empty — messages not persisted. Either worker pause handler does not store messages, or ChatPanel does not fetch prior messages on mount."
-  severity: major
-  test: 11
-  root_cause: "THREE co-dependent missing pieces (AND-gate). (1) worker pause.ts:13 suspendedRuns Map value type is {pausedAt:number} — no messages field; beacon payload is {sessionId} only. (2) No GET /sessions/:id/messages endpoint exists in worker/src/api-routes/ — grep returns no hits for messages/persist/store/save. (3) ChatPanel.tsx:87 useChat has no initialMessages; post-mount useEffect (107-125) only restores sessionId, no fetch. /api/chat is relay-only, never writes to PostgresStore (which is wired but unused for chat history). Comment at index.ts:88-91 confirms message persistence was deliberately deferred."
-  artifacts:
-    - path: "worker/src/api-routes/pause.ts"
-      issue: "Line 13: Map value type lacks messages field; handler doesn't parse messages"
-    - path: "worker/src/api-routes/resume.ts"
-      issue: "Returns suspended list, not messages"
-    - path: "worker/src/index.ts"
-      issue: "No GET /sessions/:id/messages endpoint; PostgresStore wired but unused for chat history"
-    - path: "app/components/ChatPanel.tsx"
-      issue: "Lines 87, 107-125: useChat lacks initialMessages; no fetch-on-mount"
-    - path: "app/lib/pause-signal.ts"
-      issue: "Beacon payload omits messages"
-    - path: "app/api/chat/route.ts"
-      issue: "Relay-only, no persistence write"
-  missing:
-    - "Extend suspendedRuns Map value with messages: UIMessage[] AND beacon sends them (lazy in-memory path), OR write to PostgresStore via new endpoint (durable path)"
-    - "Add registerApiRoute('/sessions/:id/messages', {method:'GET',...}) returning persisted messages"
-    - "ChatPanel mount effect: fetch('/api/messages?sessionId=...') → setMessages on useChat"
-    - "All three must ship together — single-layer fix leaves symptom intact"
-  debug_session: ".planning/debug/g-1-11-pause-resume.md"
+  status: resolved
+  resolved_by: 01-Q-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-Q: extended worker pause.ts suspendedRuns Map with `messages: UIMessage[]`; beacon payload
+    now carries `messages: messagesRef.current`; added GET /sessions/:id/messages endpoint returning
+    {messages: UIMessage[]}; ChatPanel post-mount effect fetches /api/messages?sessionId=... and
+    seeds useChat initialMessages.
 
 - gap_id: G-1-12
-  truth: "After echo call, audit_log row exists with tokens_in/out populated and matching session_id"
-  status: failed
-  reason: "audit_log table on InsForge exists but is empty. withAudit wrapper either not executing INSERT or insert failing silently — likely session_id propagation gap from requestContext to withAudit, or table/column mismatch."
-  severity: blocker
-  test: 12
-  root_cause: "createTool({execute}).execute() in @mastra/core 1.60 invokes user-supplied execute through internal tool-runner wrapper that does NOT pass a 2nd ctx argument carrying requestContext. withAudit outer signature (args, ctx?) therefore always sees ctx=undefined for echoTool. resolveSessionId(ctx) falls back to process.env.SESSION_ID ?? 'anon' — INSERT runs with wrong session_id OR INSERT throws inside finally and throw is swallowed by stream outer try/catch which only console.logs. toolApprovalResolver works fine because HITL machinery uses a different code path that passes requestContext correctly. Schema columns match INSERT values (eliminates column-mismatch hypothesis)."
-  artifacts:
-    - path: "worker/src/lib/audit.ts"
-      issue: "Lines 16-71: withAudit signature assumes 2nd-arg ctx that Mastra 1.60 tool runner doesn't deliver; resolveSessionId silently degrades to 'anon'"
-    - path: "worker/src/tools/echo.ts"
-      issue: "Lines 10-24: only place withAudit-wrapped tool ships in Phase 1; symptom surfaces here"
-    - path: "worker/src/index.ts"
-      issue: "Lines 97-99: requestContext correctly populated; breakage is downstream in tool-execute call path"
-  missing:
-    - "Stop relying on 2nd-arg ctx: thread sessionId via tool.execute higher-order wrapper at registration time, OR module-scope variable set per-request before agent.stream()"
-    - "Improve INSERT error visibility: console.error + re-throw if INSERT fails so silent failures surface in [chat-debug] logs"
-    - "Add observability: log sessionId + insert outcome per withAudit call"
-  debug_session: ".planning/debug/g-1-12-audit-log-empty.md"
+  status: resolved
+  resolved_by: 01-R-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-R: withAudit now reads sessionId from module-scope carrier (setAuditSessionId) populated by
+    the stream route before agent.stream(); no longer relies on the 2nd-arg ctx that Mastra 1.60
+    tool runner doesn't deliver. INSERT errors surface via console.error (no longer swallowed silently).
 
 - gap_id: G-1-13
-  truth: "pnpm test:audit exits 0 — redactString traps sk-/pk-/api-/key-/token-/secret-prefixed strings"
-  status: failed
-  reason: "Failing case `header api_key=AbCdEfGhIjKlMnOpQrStUvWxYz012345` not redacted. Redactor regex matches hyphenated prefixes only."
-  severity: blocker
-  test: 13
-  root_cause: "Redactor regex in lib/redact.ts:4 SECRET_RE = /(sk|pk|api|key|token|secret)[-_]?[a-z0-9_-]{20,}/gi does not allow = as separator between prefix keyword and secret value. Real-world header forms like api_key=AbCdEfGhIjKlMnOpQrStUvWxYz012345 use = as separator — not in [-_]? separator class or [a-z0-9_-] value class, so regex never matches and secret passes through. Trace: finds 'api', consumes '_' via [-_]?, then [_a-z0-9_-]{20,} can't include '=', backtracks to '_key' (4 chars) or 'key' (3 chars), never reaches 20-char threshold."
-  artifacts:
-    - path: "lib/redact.ts"
-      issue: "Line 4: SECRET_RE missing = as allowed separator; currently [-_]? should be [-_=]?"
-    - path: "worker/src/lib/audit.test.ts"
-      issue: "Lines 25-29: short-identifier test data 'short_value_123456789' (21 chars) must trim to <20 chars once = is added, else test breaks for different reason"
-  missing:
-    - "Change SECRET_RE separator class from [-_]? to [-_=]? (1-char regex fix)"
-    - "Trim test data 'short_value_123456789' to <20 chars (e.g., 'short_value_1234567' = 19 chars)"
-    - "Net diff: 2 lines, 2 files"
-  debug_session: ".planning/debug/redact-underscore-separator.md"
+  status: resolved
+  resolved_by: 01-K-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-K: changed SECRET_RE separator class from [-_]? to [-_=]? in lib/redact.ts:4. Audit test fixture
+    trimmed 'short_value_123456789' (21 chars) → 'short_value_1234567' (19 chars) so the <20-char
+    short-identifier test still passes. Net diff: 2 lines, 2 files.
 
 - gap_id: G-1-14
-  truth: "rag_query is wired on sdlcAgent and returns a context string with tool_doc_rows_consumed >= 1 in audit_log"
+  status: resolved
+  resolved_by: 01-S-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-S: imported ragQueryTool in sdlc.ts:3-5, registered on tools: object at line 24, extended
+    instructions string to tell the model when to call rag_query (e.g., before any tool whose usage
+    it's unsure about). No changes to audit.ts, classify.ts, or rag-query.ts.
+
+- gap_id: G-1-4
+  status: resolved
+  resolved_by: 01-L-PLAN.md
+  resolved_at: 2026-08-20
+  fix_summary: |
+    01-L: replaced StagePicker.tsx:72 native title= hover with Radix Tooltip wrapper around each
+    disabled button — hover surfaces within ~100ms, mouseleave clears immediately. Click path
+    (existing toast) unchanged.
+
+- gap_id: G-1-7b
+  truth: "When tool-approval-request chunk arrives, ChatPanel renders ApprovalCard inline (write-low = Approve/Deny, write-high = typed CONFIRM)"
   status: failed
-  reason: "rag_query tool implemented (worker/src/tools/rag-query.ts) but not registered on sdlcAgent — sdlc.ts:24 wires only echo/createNote/applyMigrations. Cannot trigger via chat."
+  reason: "User reported 2026-08-20: ApprovalCard never renders despite tool-approval-request chunk arriving on SSE wire with correct approvalId+toolCallId. Translator works. Failure is downstream in ChatPanel renderer."
+  severity: major
+  test: 6
+  root_cause: "ChatPanel does not subscribe to or render on `tool-approval-request` chunk type. G-1-7 originally inconclusive between (A) resolver never fires and (B) chunk translator drops. 01-N added observability — wire evidence proves translator emits the chunk. New failure is (C) ChatPanel ignores the chunk. May also overlap with sessionId='' empty in payload (G-1-12 cross-link)."
+  artifacts:
+    - path: "app/components/ChatPanel.tsx"
+      issue: "Renders text/tool parts but no handler for tool-approval-request SSE chunk"
+    - path: "app/components/ApprovalCard.tsx"
+      issue: "Component exists; never invoked because no caller feeds it the approval-request payload"
+  missing:
+    - "ChatPanel must subscribe to tool-approval-request chunks and route through tool-approval-request message part → ApprovalCard component"
+    - "Investigate why sessionId='' is empty in payload (likely /api/chat route or ChatPanel useChat transport options)"
+    - "Verify with createNote in tiered mode → card renders, Approve sends to /api/approve, tool runs"
+  debug_session: ""
+
+- gap_id: G-1-15
+  truth: "When toolApprovalResolver returns true (gating), Mastra 1.60 pauses tool execution until client sends approval; without client response, tool does NOT run"
+  status: failed
+  reason: "User reported 2026-08-20: terminal log '[approval-resolver] tool=applyMigrationsTool mode=tiered' confirms resolver fires; then '[chat-debug] chunk=tool-call-approval' (translator emits tool-approval-request); then '[chat-debug] ok text=0 tool=applyMigrationsTool' — tool ran anyway. Chunk is a notification, not a pause."
+  severity: blocker
+  test: 7
+  root_cause: "Mastra 1.60's tool-approval gate emits a tool-call-approval chunk for client-side UI rendering but does NOT actually halt the underlying tool execution in streaming mode. The resolver return value is informational only — once the stream is flowing, the LLM/agent runtime calls the tool regardless of the resolver decision. Likely fix path: drop reliance on Mastra's approval gate; implement manual gate in worker/src/index.ts stream translator — buffer tool-call chunks until client posts /api/approve with matching approvalId, then flush; on timeout/abort, drop and emit error chunk. Or use agent.generate() in non-streaming mode for write_low/write_high tools with a request-scoped approval map."
+  artifacts:
+    - path: "worker/src/index.ts"
+      issue: "Stream translator must intercept tool-call-approval chunks and buffer instead of forwarding"
+    - path: "worker/src/agents/sdlc.ts"
+      issue: "toolApprovalResolver return is informational only in streaming; gate logic needs to live in translator"
+    - path: "node_modules/@mastra/core/dist/agent-BVtn9FqD.cjs"
+      issue: "Mastra 1.60 streaming flow doesn't block on approval resolver"
+  missing:
+    - "Implement explicit per-approvalId gate in worker stream translator: on tool-call-approval chunk, suspend stream, write tool-approval-request to SSE, await POST /api/approve?approvalId=... from client; on Approve: resume stream; on Deny: emit tool-output-error chunk and resume; on 60s timeout: emit tool-output-error"
+    - "ApprovalCard Approve/Deny buttons POST to /api/approve with approvalId"
+    - "Drop dependence on toolApprovalResolver streaming flow; keep classifier + resolveApproval for audit-decision recording only"
+  debug_session: ""
+
+- gap_id: G-1-16
+  truth: "After each chat reply, cost counter ticks to a non-zero (or updated) USD value derived from token usage"
+  status: failed
+  reason: "User reported 2026-08-20: counter shows '~ $0.0000' static, value never changes across multiple replies. 01-P prevented the TypeError crash but data wire is incomplete."
+  severity: minor
+  test: 10
+  root_cause: "Three suspects. (a) Worker step-finish handler not actually emitting data-usage DataUIMessageChunk to SSE — must_haves claim says it does, runtime shows it doesn't. (b) CostCounter not finding data-usage parts in m.parts — maybe wrong part-type string ('data-usage' vs 'usage' vs 'data:usage'). (c) opencode-go/hy3 pricing table row exists but all rates are 0 — counter correct, just free model."
+  artifacts:
+    - path: "worker/src/index.ts"
+      issue: "Verify step-finish handler emits data-usage DataUIMessageChunk — check worker terminal for usage log line"
+    - path: "app/components/CostCounter.tsx"
+      issue: "Verify part-type filter matches what worker emits"
+    - path: "lib/pricing.ts"
+      issue: "Verify opencode-go/hy3 PRICING row has non-zero rates or note that it is genuinely free"
+  missing:
+    - "Confirm with user: does worker terminal show usage log line per reply?"
+    - "Inspect m.parts in browser devtools after a reply — look for any data-* type parts"
+    - "If opencode-go/hy3 is free, document this as expected behavior and accept minor status"
+  debug_session: ""
+
+- gap_id: G-1-11b
+  truth: "After close+reopen of tab with same sessionId, prior chat messages reappear in the chat panel"
+  status: failed
+  reason: "User reported 2026-08-20: POST /api/pause 200 (beacon fires), GET /api/messages?sessionId=... 200 (fetch fires), sessionId persists in localStorage — but chat panel stays empty. Round-trip incomplete."
+  severity: major
+  test: 11
+  root_cause: "01-Q shipped the GET endpoint and ChatPanel mount-fetch, but three possible breaks. (a) Beacon payload in pause-signal.ts may still omit `messages` array even after 01-Q — verify the field is actually serialized. (b) Worker pause.ts may not store the messages field in suspendedRuns Map value type — verify type allows it. (c) ChatPanel useEffect may fetch but not seed useChat's initialMessages (returns are ignored)."
+  artifacts:
+    - path: "app/lib/pause-signal.ts"
+      issue: "Verify beacon payload includes messages: messagesRef.current"
+    - path: "worker/src/api-routes/pause.ts"
+      issue: "Verify suspendedRuns.set stores messages field"
+    - path: "app/components/ChatPanel.tsx"
+      issue: "Verify fetch result seeds useChat initialMessages"
+  missing:
+    - "Curl worker /sessions/sess-k4609nex/messages → check response body shape"
+    - "In devtools network tab, inspect /api/messages response body — is it {messages: []} or missing?"
+    - "If empty array: worker has no stored snapshot; trace beacon → worker pause handler → suspendedRuns write"
+    - "If non-empty array: ChatPanel fetch but not seeding useChat; verify setMessages or initialMessages wiring"
+  debug_session: ""
+
+- gap_id: G-1-12b
+  truth: "After echo call, audit_log contains at least 1 row with session_id set and tokens_in/out populated"
+  status: failed
+  reason: "User reported 2026-08-20: audit_log still 'No Records Found' on InsForge after echo call. 01-R's module-scope carrier did not result in a successful INSERT."
+  severity: blocker
+  test: 12
+  root_cause: "01-R may have only refactored sessionId plumbing but withAudit still not invoked on the tool-execute path (Mastra 1.60 createTool({execute}).execute() may not even reach the withAudit wrapper, instead invoking the inner raw execute directly). Or INSERT is failing and the new console.error isn't surfacing (worker not running, db connection dropped, schema drift). Empty sessionId='' in payload cross-link suggests withAudit may also be writing with bad session_id."
+  artifacts:
+    - path: "worker/src/lib/audit.ts"
+      issue: "Verify withAudit wrapper is invoked on echo tool execute path; verify INSERT reaches db"
+    - path: "worker/src/index.ts"
+      issue: "Verify stream route calls setAuditSessionId before agent.stream()"
+    - path: "lib/insforge.ts"
+      issue: "Verify db client connection is live and audit_log schema matches INSERT columns"
+  missing:
+    - "Worker terminal log scan during echo call: any '[withAudit]' or INSERT error lines?"
+    - "Direct curl to worker /health: is worker alive?"
+    - "Direct insert from worker into audit_log: does it succeed or fail?"
+  debug_session: ""
+
+- gap_id: G-1-14b
+  truth: "rag_query returns context string and renders as tool result in chat; resolver does NOT gate read-tier tools"
+  status: failed
+  reason: "User reported 2026-08-20: model calls ragQueryTool correctly but '[approval-resolver] tool=ragQueryTool mode=tiered' fires (read tool should not gate); tool runs but SSE ends after tool-approval-request with no tool-output chunk; user sees no context result in chat."
   severity: blocker
   test: 15
-  root_cause: "ragQueryTool implemented at worker/src/tools/rag-query.ts:17 with id='rag_query', correctly classified as 'read' in classify.ts:12, withAudit wraps execute returning {context, tool_doc_rows_consumed} and audit.ts:46 sets approval_decision='auto' for read-class tools — downstream pipeline fully prepared. But sdlc.ts:3-5 imports only echo/createNote/applyMigrationsTool; sdlc.ts:24 registers only those three; sdlc.ts:19-22 instructions string never names rag_query so model wouldn't know when to call it even if wired."
+  root_cause: "Two stacked defects. (a) toolApprovalResolver fires for ALL tools regardless of classify tier — it gates read tools too. classify('rag_query')='read' should make resolveApproval return false; the resolver code may be ignoring the tier. (b) When tool-call-approval chunk is emitted in Mastra 1.60 streaming, the tool-result chunk never reaches SSE because the gate is not closed by client — same root as G-1-15. Tool runs (Mastra default) but client never sees result."
   artifacts:
     - path: "worker/src/agents/sdlc.ts"
-      issue: "Lines 3-5: missing import ragQueryTool from ../tools/rag-query; line 24: missing ragQueryTool in tools object; lines 19-22: instructions don't tell model when to use rag_query"
+      issue: "toolApprovalResolver must consult classify(toolName) and short-circuit return false for read tier"
+    - path: "worker/src/index.ts"
+      issue: "Stream translator must forward tool-output-available chunk regardless of approval chunk emission"
   missing:
-    - "Add `import { ragQueryTool } from '../tools/rag-query';` after line 5"
-    - "Add ragQueryTool to tools object on line 24"
-    - "Extend instructions string to tell model when to call rag_query (e.g., 'Call rag_query before any tool whose usage you are unsure about')"
-    - "No changes needed in audit.ts, classify.ts, or rag-query.ts"
-  debug_session: ".planning/debug/g-1-14-rag-query-not-registered.md"
+    - "Resolver: `const tier = classify(toolName); if (tier === 'read') return false;` before any approvalMode logic"
+    - "Translator: tool-input-available → wait for tool result → tool-output-available chunk must be emitted (currently dropped after tool-approval-request)"
+    - "Verify rag_query after fix: returns context string referencing notion-guides-mcp-overview.md"
+  debug_session: ""
 
 - gap_id: G-1-1
   truth: "Worker boots, /api/health returns worker_up:true"

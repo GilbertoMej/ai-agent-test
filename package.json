@@ -10,6 +10,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:generate": "drizzle-kit generate",
     "embed:tools": "tsx scripts/embed-tool-docs.ts",
+    "ingest:doc": "tsx scripts/ingest-doc.ts",
     "smoke": "bash scripts/smoke.sh",
     "smoke:stopped-worker": "bash scripts/smoke-stopped-worker.sh",
     "test:audit": "node --import tsx --test worker/src/lib/audit.test.ts",
