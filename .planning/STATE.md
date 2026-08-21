@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: Completed 01-P-PLAN.md — gap closure (CostCounter ticks from data-usage chunks + messageMetadata.modelId)
-last_updated: "2026-08-20T23:56:00.000Z"
+stopped_at: Completed 01-Q-PLAN.md — gap closure G-1-11 (pause/resume persists chat messages — worker stores messages snapshot + GET /sessions/:id/messages + ChatPanel fetches on mount)
+last_updated: "2026-08-21T00:03:20.000Z"
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 19
-  completed_plans: 14
-current_plan: P
+  completed_plans: 15
+current_plan: Q
 total_plans: 19
 ---
 
@@ -65,6 +65,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 01 PL | 5 | 1 tasks | 1 files |
 | Phase 01 PM | 3 | 2 tasks | 2 files |
 | Phase 01 PP | 5 | 3 tasks | 4 files |
+| Phase 01 PQ | 6 | 2 tasks | 5 files |
 
 ## Decisions Log (from executed plans)
 
@@ -93,6 +94,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-20 | Pre-existing: tsc reports 14 errors in ChatPanel.tsx / lib/insforge.ts / pause.ts / resume.ts; NOT introduced by 01-F — track for post-Phase-1 cleanup | 01-F carryover |
 | 2026-08-20 | G-1-4 closed: StagePicker native HTML title= replaced with React state hover tooltip (sub-100 ms latency); click toast path preserved; no new deps | 01-L |
 | 2026-08-20 | G-1-10 closed: CostCounter wires modelId via worker SSE start.messageMetadata + reads tokens from data-usage DataUIMessageChunk (real AI SDK v5 wire field); estimateCostUsd guarded against missing pricing keys | 01-P |
+| 2026-08-21 | G-1-11 closed: pause/resume persists chat messages — worker SuspendedRun stores messages snapshot, new GET /sessions/:id/messages endpoint, browser beacon sends messages alongside sessionId, ChatPanel fetches /api/messages on mount and seeds useChat (in-memory Map; Phase 8 adds durable persistence) | 01-Q |
 
 ## Accumulated Context
 
@@ -129,10 +131,10 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-P-PLAN.md — gap closure (CostCounter ticks from data-usage chunks + messageMetadata.modelId)
+**Stopped at:** Completed 01-Q-PLAN.md — gap closure G-1-11 (pause/resume persists chat messages — worker stores messages snapshot + GET /sessions/:id/messages + ChatPanel fetches on mount)
 **Resume file:** None
 
-**Last session:** 2026-08-20T23:46:40.316Z
+**Last session:** 2026-08-21T00:03:20.000Z
 
 **Resume command:** `/gsd-verify-work 1` (phase verification) → `/gsd-plan-phase 2` (Notion MCP Integration)
 
