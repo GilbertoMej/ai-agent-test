@@ -1,9 +1,9 @@
 ---
-status: testing
+status: diagnosed
 phase: 01-foundation
 source: 01-A-SUMMARY.md, 01-B-SUMMARY.md, 01-C-SUMMARY.md, 01-D-SUMMARY.md, 01-E-SUMMARY.md, 01-F-SUMMARY.md
 started: 2026-08-19T19:00:00Z
-updated: 2026-08-20T18:30:00Z
+updated: 2026-08-20T20:40:00Z
 ---
 
 ## Current Test
@@ -213,101 +213,91 @@ reconciled_resolved: 9
 - gap_id: G-1-7b
   truth: "When tool-approval-request chunk arrives, ChatPanel renders ApprovalCard inline (write-low = Approve/Deny, write-high = typed CONFIRM)"
   status: failed
-  reason: "User reported 2026-08-20: ApprovalCard never renders despite tool-approval-request chunk arriving on SSE wire with correct approvalId+toolCallId. Translator works. Failure is downstream in ChatPanel renderer."
+  reason: "User reported 2026-08-20: ApprovalCard never renders despite tool-approval-request chunk arriving on SSE wire with correct approvalId+toolCallId."
   severity: major
   test: 6
-  root_cause: "ChatPanel does not subscribe to or render on `tool-approval-request` chunk type. G-1-7 originally inconclusive between (A) resolver never fires and (B) chunk translator drops. 01-N added observability — wire evidence proves translator emits the chunk. New failure is (C) ChatPanel ignores the chunk. May also overlap with sessionId='' empty in payload (G-1-12 cross-link)."
+  root_cause: "AI SDK v7 chunk reducer at node_modules/.pnpm/ai@7.0.68_zod@4.4.3/node_modules/ai/src/ui/process-ui-message-stream.ts:746-758 MUTATES the existing tool-<name> part (setting state='approval-requested' + approval={id}); it does NOT push a new top-level part with type 'tool-approval-request'. ChatPanel.tsx:233 filters on `p.type === 'tool-approval-request'` — that part type never exists; <ApprovalCard/> JSX at 247-256 never executes. ActionFeed.tsx:46-65 already uses the correct dimension (tp.state === 'approval-requested')."
   artifacts:
     - path: "app/components/ChatPanel.tsx"
-      issue: "Renders text/tool parts but no handler for tool-approval-request SSE chunk"
-    - path: "app/components/ApprovalCard.tsx"
-      issue: "Component exists; never invoked because no caller feeds it the approval-request payload"
+      issue: "Lines 232-257: filter on non-existent part type; needs `p.type.startsWith('tool-') && p.state === 'approval-requested'`"
+    - path: "app/components/ActionFeed.tsx"
+      issue: "Line 46: already correct dimension but lacks card render (only status pill)"
   missing:
-    - "ChatPanel must subscribe to tool-approval-request chunks and route through tool-approval-request message part → ApprovalCard component"
-    - "Investigate why sessionId='' is empty in payload (likely /api/chat route or ChatPanel useChat transport options)"
-    - "Verify with createNote in tiered mode → card renders, Approve sends to /api/approve, tool runs"
-  debug_session: ""
+    - "Swap filter from `p.type === 'tool-approval-request'` to `p.type.startsWith('tool-') && p.state === 'approval-requested' && !p.approval?.isAutomatic`"
+    - "Read toolName/input/approval.id directly from the tool part"
+    - "Wire decide() through AI SDK v7 addToolApprovalResponse so chunk round-trips and tool can resume"
+    - "Retire dead ApprovalRequestPart type + lookupToolPart helper at ChatPanel.tsx:32, 35-39"
+  debug_session: ".planning/debug/g-1-7b-write-low-card-renderer.md"
 
 - gap_id: G-1-15
-  truth: "When toolApprovalResolver returns true (gating), Mastra 1.60 pauses tool execution until client sends approval; without client response, tool does NOT run"
+  truth: "When user clicks Approve on ApprovalCard, /api/approve records audit AND calls agent.approveToolCall({runId, toolCallId}) to resume the suspended workflow"
   status: failed
-  reason: "User reported 2026-08-20: terminal log '[approval-resolver] tool=applyMigrationsTool mode=tiered' confirms resolver fires; then '[chat-debug] chunk=tool-call-approval' (translator emits tool-approval-request); then '[chat-debug] ok text=0 tool=applyMigrationsTool' — tool ran anyway. Chunk is a notification, not a pause."
-  severity: blocker
+  reason: "User reported 2026-08-20: terminal shows tool-call-approval chunk emitted but no tool-result; user inferred 'tool ran anyway' but actually gate is honored + workflow suspended. The downstream plumbing never resumes."
+  severity: major
   test: 7
-  root_cause: "Mastra 1.60's tool-approval gate emits a tool-call-approval chunk for client-side UI rendering but does NOT actually halt the underlying tool execution in streaming mode. The resolver return value is informational only — once the stream is flowing, the LLM/agent runtime calls the tool regardless of the resolver decision. Likely fix path: drop reliance on Mastra's approval gate; implement manual gate in worker/src/index.ts stream translator — buffer tool-call chunks until client posts /api/approve with matching approvalId, then flush; on timeout/abort, drop and emit error chunk. Or use agent.generate() in non-streaming mode for write_low/write_high tools with a request-scoped approval map."
+  root_cause: "Mastra 1.60 gate IS honored (agent-BVtn9FqD.cjs:26271-26307: `return suspend(...)` BEFORE tool.execute() — line 26726 unreachable on gated-no-approval path). Three downstream defects create the user-observable symptom. (1) worker/src/index.ts:194-195 emits unconditional `finish`+`[DONE]` after for-await loop, masking suspended state. (2) /api/approve at worker/src/lib/approval-route.ts:44-58 records audit + grant but never calls `agent.approveToolCall({runId, toolCallId})` to resume; /api/decline never calls `agent.declineToolCall`. (3) ChatPanel never renders the card (G-1-7b)."
   artifacts:
     - path: "worker/src/index.ts"
-      issue: "Stream translator must intercept tool-call-approval chunks and buffer instead of forwarding"
-    - path: "worker/src/agents/sdlc.ts"
-      issue: "toolApprovalResolver return is informational only in streaming; gate logic needs to live in translator"
-    - path: "node_modules/@mastra/core/dist/agent-BVtn9FqD.cjs"
-      issue: "Mastra 1.60 streaming flow doesn't block on approval resolver"
+      issue: "Lines 194-195: track upstream `finish`; only emit finish when not suspended"
+    - path: "worker/src/lib/approval-route.ts"
+      issue: "Lines 44-58: must call agent.approveToolCall() to resume suspended workflow; pipe resumed chunks into SSE"
+    - path: "app/components/ChatPanel.tsx"
+      issue: "Approve/Deny buttons POST to /api/approve with approvalId+toolCallId"
   missing:
-    - "Implement explicit per-approvalId gate in worker stream translator: on tool-call-approval chunk, suspend stream, write tool-approval-request to SSE, await POST /api/approve?approvalId=... from client; on Approve: resume stream; on Deny: emit tool-output-error chunk and resume; on 60s timeout: emit tool-output-error"
-    - "ApprovalCard Approve/Deny buttons POST to /api/approve with approvalId"
-    - "Drop dependence on toolApprovalResolver streaming flow; keep classifier + resolveApproval for audit-decision recording only"
-  debug_session: ""
+    - "worker/src/index.ts:194-195 — distinguish suspended vs finished terminal state"
+    - "worker/src/lib/approval-route.ts — agent.approveToolCall({runId, toolCallId}) resume; pipe MastraModelOutput chunks to SSE; agent.declineToolCall() with error chunk"
+    - "ChatPanel ApprovalCard onApprove POSTs {approvalId, toolCallId, toolName, args, tier, sessionId}"
+  debug_session: ".planning/debug/g-1-15-mastra-gate-bypass.md"
 
 - gap_id: G-1-16
   truth: "After each chat reply, cost counter ticks to a non-zero (or updated) USD value derived from token usage"
   status: failed
-  reason: "User reported 2026-08-20: counter shows '~ $0.0000' static, value never changes across multiple replies. 01-P prevented the TypeError crash but data wire is incomplete."
+  reason: "User reported 2026-08-20: counter shows '~ $0.0000' static, value never changes across multiple replies."
   severity: minor
   test: 10
-  root_cause: "Three suspects. (a) Worker step-finish handler not actually emitting data-usage DataUIMessageChunk to SSE — must_haves claim says it does, runtime shows it doesn't. (b) CostCounter not finding data-usage parts in m.parts — maybe wrong part-type string ('data-usage' vs 'usage' vs 'data:usage'). (c) opencode-go/hy3 pricing table row exists but all rates are 0 — counter correct, just free model."
+  root_cause: "(c) confirmed at lib/pricing.ts:24: opencode-go/hy3 PRICING row has $0/$0 placeholder rates. Wire + types + math are all correct (worker emits data-usage, CostCounter reads data-usage, AI SDK v5 DataUIMessageChunk contract matches). With $0/$0 rates, (tokensIn * 0 + tokensOut * 0) / 1_000_000 = 0 regardless of token volume. (b) eliminated; (a) plausible secondary (gated by `if (usage)` at worker/src/index.ts:181) but irrelevant when rates are zero."
   artifacts:
-    - path: "worker/src/index.ts"
-      issue: "Verify step-finish handler emits data-usage DataUIMessageChunk — check worker terminal for usage log line"
-    - path: "app/components/CostCounter.tsx"
-      issue: "Verify part-type filter matches what worker emits"
     - path: "lib/pricing.ts"
-      issue: "Verify opencode-go/hy3 PRICING row has non-zero rates or note that it is genuinely free"
+      issue: "Line 24: opencode-go/hy3 PRICING row rates zeroed with comment 'unverified — verify tier at https://opencode.dev/pricing'"
   missing:
-    - "Confirm with user: does worker terminal show usage log line per reply?"
-    - "Inspect m.parts in browser devtools after a reply — look for any data-* type parts"
-    - "If opencode-go/hy3 is free, document this as expected behavior and accept minor status"
-  debug_session: ""
+    - "Operator decision: either (a) verify actual pricing at opencode.dev/pricing and update rates; OR (b) accept-as-design — model is genuinely free tier; close gap with annotation"
+    - "Optional secondary: add one-line console.log at worker/src/index.ts:178 inside step-finish branch to surface whether payload.totalUsage is populated"
+  debug_session: ".planning/debug/g-1-16-cost-counter-zero.md"
 
 - gap_id: G-1-11b
   truth: "After close+reopen of tab with same sessionId, prior chat messages reappear in the chat panel"
   status: failed
-  reason: "User reported 2026-08-20: POST /api/pause 200 (beacon fires), GET /api/messages?sessionId=... 200 (fetch fires), sessionId persists in localStorage — but chat panel stays empty. Round-trip incomplete."
+  reason: "User reported 2026-08-20: POST /api/pause 200, GET /api/messages 200, but chat empty after reopen."
   severity: major
   test: 11
-  root_cause: "01-Q shipped the GET endpoint and ChatPanel mount-fetch, but three possible breaks. (a) Beacon payload in pause-signal.ts may still omit `messages` array even after 01-Q — verify the field is actually serialized. (b) Worker pause.ts may not store the messages field in suspendedRuns Map value type — verify type allows it. (c) ChatPanel useEffect may fetch but not seed useChat's initialMessages (returns are ignored)."
+  root_cause: "ChatPanel constructs `useChat({ messages: initialMessages })` at first render when initialMessages is still `[]` (useState default). Mount effect fetches prior messages and calls setInitialMessages(...) — but AI SDK v5 useChat treats `messages` as a one-shot initial seed captured at hook construction, not re-read on each render. Fetched snapshot is silently dropped. Secondary bug: messagesRef.current in pause-signal.ts is captured one render-cycle stale (closure misses most recent message)."
   artifacts:
-    - path: "app/lib/pause-signal.ts"
-      issue: "Verify beacon payload includes messages: messagesRef.current"
-    - path: "worker/src/api-routes/pause.ts"
-      issue: "Verify suspendedRuns.set stores messages field"
     - path: "app/components/ChatPanel.tsx"
-      issue: "Verify fetch result seeds useChat initialMessages"
+      issue: "Lines 85,99,131-148: useChat captures empty initialMessages at first render; setInitialMessages in effect has no effect"
+    - path: "app/lib/pause-signal.ts"
+      issue: "Lines 39-53 + ChatPanel:115: messagesRef.current one render-cycle stale"
   missing:
-    - "Curl worker /sessions/sess-k4609nex/messages → check response body shape"
-    - "In devtools network tab, inspect /api/messages response body — is it {messages: []} or missing?"
-    - "If empty array: worker has no stored snapshot; trace beacon → worker pause handler → suspendedRuns write"
-    - "If non-empty array: ChatPanel fetch but not seeding useChat; verify setMessages or initialMessages wiring"
-  debug_session: ""
+    - "Gate panel on `loaded` flag: `if (!loaded) return null`; construct useChat with `messages: fetched` as initialMessages only after fetch settles; setLoaded(true) in fetch.then"
+    - "Move messagesRef update to commit effect so beacon closure captures freshest state"
+  debug_session: ".planning/debug/g-1-11b-pause-resume-roundtrip.md"
 
 - gap_id: G-1-12b
-  truth: "After echo call, audit_log contains at least 1 row with session_id set and tokens_in/out populated"
+  truth: "After echo call, audit_log contains at least 1 row with session_id matching browser sessionId"
   status: failed
-  reason: "User reported 2026-08-20: audit_log still 'No Records Found' on InsForge after echo call. 01-R's module-scope carrier did not result in a successful INSERT."
+  reason: "User reported 2026-08-20: audit_log still 'No Records Found' on InsForge after echo call."
   severity: blocker
   test: 12
-  root_cause: "01-R may have only refactored sessionId plumbing but withAudit still not invoked on the tool-execute path (Mastra 1.60 createTool({execute}).execute() may not even reach the withAudit wrapper, instead invoking the inner raw execute directly). Or INSERT is failing and the new console.error isn't surfacing (worker not running, db connection dropped, schema drift). Empty sessionId='' in payload cross-link suggests withAudit may also be writing with bad session_id."
+  root_cause: "ChatPanel.tsx:97 passes `body: { approvalMode, sessionId }` as STATIC object. AI SDK v5 useChat captures the transport on first render; DefaultChatTransport resolves body once at construction (http-chat-transport.ts:93,139,149). sessionId='' captured from first render (useState default). Post-mount setSessionId never propagates. setAuditSessionId('') → currentSessionId='' falsy → falls through → INSERT writes session_id='anon'. withAudit IS invoked (tool-DyGWe9X6.cjs:706-791 confirms originalExecute wrapper). User's query filter (browser sessionId) never matches 'anon' rows."
   artifacts:
-    - path: "worker/src/lib/audit.ts"
-      issue: "Verify withAudit wrapper is invoked on echo tool execute path; verify INSERT reaches db"
+    - path: "app/components/ChatPanel.tsx"
+      issue: "Line 97: static body captures sessionId='' at first render"
     - path: "worker/src/index.ts"
-      issue: "Verify stream route calls setAuditSessionId before agent.stream()"
-    - path: "lib/insforge.ts"
-      issue: "Verify db client connection is live and audit_log schema matches INSERT columns"
+      issue: "Line 112: ?? not || — empty string survives into requestContext registry"
   missing:
-    - "Worker terminal log scan during echo call: any '[withAudit]' or INSERT error lines?"
-    - "Direct curl to worker /health: is worker alive?"
-    - "Direct insert from worker into audit_log: does it succeed or fail?"
-  debug_session: ""
+    - "Change ChatPanel.tsx:97 from `body: { approvalMode, sessionId }` to `body: () => ({ approvalMode, sessionId })` (function form) — re-reads React closure on every sendMessage"
+    - "Optional: swap ?? → || at worker/src/index.ts:112 so empty payload sessionId falls back to 'anon' verbatim"
+    - "Verify: SELECT * FROM audit_log should show session_id='anon' rows pre-fix; post-fix should show session_id=<browser-id> rows"
+  debug_session: ".planning/debug/g-1-12b-audit-log-empty.md"
 
 - gap_id: G-1-14b
   truth: "rag_query returns context string and renders as tool result in chat; resolver does NOT gate read-tier tools"
@@ -315,17 +305,17 @@ reconciled_resolved: 9
   reason: "User reported 2026-08-20: model calls ragQueryTool correctly but '[approval-resolver] tool=ragQueryTool mode=tiered' fires (read tool should not gate); tool runs but SSE ends after tool-approval-request with no tool-output chunk; user sees no context result in chat."
   severity: blocker
   test: 15
-  root_cause: "Two stacked defects. (a) toolApprovalResolver fires for ALL tools regardless of classify tier — it gates read tools too. classify('rag_query')='read' should make resolveApproval return false; the resolver code may be ignoring the tier. (b) When tool-call-approval chunk is emitted in Mastra 1.60 streaming, the tool-result chunk never reaches SSE because the gate is not closed by client — same root as G-1-15. Tool runs (Mastra default) but client never sees result."
+  root_cause: "classify.ts:12 matches tool IDs ('rag_query', 'echo', etc.) but toolApprovalResolver receives the PROPERTY KEY from the tools: { ... } object map ('ragQueryTool', 'echoTool'). Every tool falls through to write_high default at classify.ts:36. resolveApproval returns 'always' for everything. Mastra 1.60 suspends the workflow (agent-BVtn9FqD.cjs:26271-26307) before tool.execute. No tool-result chunk emitted. Both stacked symptoms collapse to this one defect."
   artifacts:
+    - path: "worker/src/lib/classify.ts"
+      issue: "Lines 12-14: matches tool IDs only - property keys (ragQueryTool, echoTool) never match"
     - path: "worker/src/agents/sdlc.ts"
-      issue: "toolApprovalResolver must consult classify(toolName) and short-circuit return false for read tier"
-    - path: "worker/src/index.ts"
-      issue: "Stream translator must forward tool-output-available chunk regardless of approval chunk emission"
+      issue: "Lines 33-50: passes ctx.toolName (property key) to classify() without normalization"
   missing:
-    - "Resolver: `const tier = classify(toolName); if (tier === 'read') return false;` before any approvalMode logic"
-    - "Translator: tool-input-available → wait for tool result → tool-output-available chunk must be emitted (currently dropped after tool-approval-request)"
-    - "Verify rag_query after fix: returns context string referencing notion-guides-mcp-overview.md"
-  debug_session: ""
+    - "Normalize in resolver (recommended): strip trailing 'Tool' suffix from camelCase keys before passing to classify() - 2-line helper, no API changes, fixes all four tools at once"
+    - "Alternative (b): look up by tool ID via tools-by-key map passed to resolver"
+    - "Verify post-fix: rag_query returns context (Test 15), echo still doesn't gate (Test 5), createNote still gates in tiered (Test 6)"
+  debug_session: ".planning/debug/g-1-14b-rag-query-result-forwarding.md"
 
 - gap_id: G-1-1
   truth: "Worker boots, /api/health returns worker_up:true"
