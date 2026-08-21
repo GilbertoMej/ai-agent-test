@@ -14,6 +14,13 @@ import { resolveApproval, loadActiveGrants, type ApprovalMode } from "../lib/app
 // `provider/model` string and Mastra auto-routes via the provider registry.
 // `modelSettings: { maxTokens }` moved off the agent config — Mastra 1.60 only accepts
 // it inside a model-fallbacks array. Per-call `agent.stream(messages, { maxTokens })` covers it.
+// Key -> tool id, derived from the tools object so classify() (which matches
+// IDs) always sees the canonical name. Mastra 1.60 passes the property KEY
+// (e.g. ragQueryTool) to the approval resolver, not the id (rag_query) — without
+// this mapping rag_query normalizes to "ragQuery", misses classify(), and falls
+// through to write_high, gating RAG in every mode.
+const tools = { echoTool, createNoteTool, applyMigrationsTool, ragQueryTool };
+
 export const sdlcAgent = new Agent({
   id: "sdlcAgent",
   name: "SDLC Agent",
@@ -24,18 +31,20 @@ export const sdlcAgent = new Agent({
     "Use createNote when the user asks for a note; use applyMigrations when the user asks to migrate. " +
     "For everything else, answer from chat.",
   model: "opencode-go/hy3",
-  tools: { echoTool, createNoteTool, applyMigrationsTool, ragQueryTool },
+  tools,
 });
 
-// Mastra 1.60 passes the PROPERTY KEY from the `tools: { ... }` object map
-// (e.g. "ragQueryTool", "echoTool") to ToolApprovalContext, not the tool's
-// `id`. classify() matches tool IDs ("rag_query", "echo"). Without
-// normalization, every tool falls through to the write_high default and the
-// resolver gates read tools — which Mastra 1.60 enforces by suspending the
-// workflow before tool execution. Strip the "Tool" suffix that the sdlc.ts
-// tools: object keys all share.
+// Mastra 1.60 passes the property KEY (e.g. "ragQueryTool") to
+// ToolApprovalContext, not the tool's `id` ("rag_query"). classify() matches
+// ids, so normalizeToolName maps key -> id (TOOL_KEY_TO_ID below) before
+// classifying. Without it, rag_query normalizes to "ragQuery", misses
+// classify(), falls through to write_high, and the resolver gates RAG.
+const TOOL_KEY_TO_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(tools).map(([k, v]) => [k, (v as { id: string }).id]),
+) as Record<string, string>;
+
 function normalizeToolName(n: string): string {
-  return n.endsWith("Tool") ? n.slice(0, -4) : n;
+  return TOOL_KEY_TO_ID[n] ?? (n.endsWith("Tool") ? n.slice(0, -4) : n);
 }
 
 // Per-call `requireToolApproval` resolver (Mastra 1.60 signature).
