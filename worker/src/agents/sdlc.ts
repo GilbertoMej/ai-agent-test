@@ -27,6 +27,17 @@ export const sdlcAgent = new Agent({
   tools: { echoTool, createNoteTool, applyMigrationsTool, ragQueryTool },
 });
 
+// Mastra 1.60 passes the PROPERTY KEY from the `tools: { ... }` object map
+// (e.g. "ragQueryTool", "echoTool") to ToolApprovalContext, not the tool's
+// `id`. classify() matches tool IDs ("rag_query", "echo"). Without
+// normalization, every tool falls through to the write_high default and the
+// resolver gates read tools — which Mastra 1.60 enforces by suspending the
+// workflow before tool execution. Strip the "Tool" suffix that the sdlc.ts
+// tools: object keys all share.
+function normalizeToolName(n: string): string {
+  return n.endsWith("Tool") ? n.slice(0, -4) : n;
+}
+
 // Per-call `requireToolApproval` resolver (Mastra 1.60 signature).
 // Honors session-wide approvalMode (from AutoApproveToggle) and active approval_grants (5-min batch button).
 // 'always' from resolveApproval() maps to true (gate the call); false/true map through unchanged.
@@ -45,6 +56,7 @@ export async function toolApprovalResolver(
   const raw = rc.getRaw?.("approvalMode");
   const approvalMode = (raw ?? rc.approvalMode) as ApprovalMode | undefined;
   const grants = await loadActiveGrants();
-  console.log(`[approval-resolver] tool=${ctx.toolName} mode=${approvalMode ?? "undef"}`);
-  return resolveApproval(ctx.toolName, { approvalMode, grants }) === "always";
+  const toolName = normalizeToolName(ctx.toolName);
+  console.log(`[approval-resolver] tool=${toolName} mode=${approvalMode ?? "undef"}`);
+  return resolveApproval(toolName, { approvalMode, grants }) === "always";
 }
