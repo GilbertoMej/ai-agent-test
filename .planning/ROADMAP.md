@@ -33,11 +33,11 @@
   4. Read-only tools run silently; low-risk writes prompt the user; high-risk writes demand typed confirmation; the "auto-approve all" toggle bypasses prompts for the current session
   5. User sees a running token-cost estimate in the header
 
-**Plans**: 21/26 plans executed
+**Plans**: 22/26 plans executed
 
 - [x] 01-T-PLAN.md
 - [x] 01-U-PLAN.md
-- [ ] 01-V-PLAN.md
+- [x] 01-V-PLAN.md
 - [ ] 01-W-PLAN.md
 - [ ] 01-X-PLAN.md
 - [ ] 01-Y-PLAN.md
@@ -175,7 +175,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 21/26 | In Progress|  |
+| 1. Foundation | 22/26 | In Progress|  |
 | 2. Notion MCP Integration | 0/TBD | Not started | - |
 | 3. Linear MCP Integration | 0/TBD | Not started | - |
 | 4. v0 Design + Coding Sub-agent | 0/TBD | Not started | - |
@@ -191,3 +191,4 @@
 *Phase 1 plan verified 2026-08-19: 5/5 PLANs executed, 0 blockers; gap-closure (01-E) closed 5 must-haves*
 *Phase 1 plan D complete 2026-08-19: 7/7 tasks (UI shell + resilience + locked smoke script) landed.*
 *Phase 1 plan E complete 2026-08-19: 3/3 surgical gap-closure tasks (install pin + custom stream route + echo audit wrap).*
+*Phase 1 plan V complete 2026-08-21: 1/1 surgical gap-closure task (useChat setMessages seed via mount-fetch .then; `messages: initialMessages` one-shot prop retired; prior chat reappears on close+reopen).*
