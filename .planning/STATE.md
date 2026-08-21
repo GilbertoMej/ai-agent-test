@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: "Completed 01-T-PLAN.md — Phase 1 gap-closure G-1-14b: resolver normalizes tools:{} property keys before classify (ragQuery/echo/createNote/applyMigrations)"
-last_updated: "2026-08-21T14:54:44.552Z"
+stopped_at: "Completed 01-U-PLAN.md — Phase 1 gap-closure G-1-12b: DefaultChatTransport body is now a function form so post-mount setSessionId(fresh) propagates to /api/chat POSTs (was captured at first render with sessionId='', falling through to 'anon' in audit_log)"
+last_updated: "2026-08-21T15:03:20.000Z"
 progress:
   total_phases: 1
   completed_phases: 1
   total_plans: 26
-  completed_plans: 20
-current_plan: T
+  completed_plans: 21
+current_plan: U
 total_plans: 26
 ---
 
@@ -30,10 +30,10 @@ total_plans: 26
 ## Current Position
 
 - **Phase:** 2 — Notion MCP Integration
-- **Plans:** 20/26 plans complete (01-A..01-S, 01-O, 01-T); Phase 1 gap-closure batch in progress (T, U, V, W, X, Y, Z)
-- **Status:** Phase 1 77% complete (gap-closure batch executing); ready for `/gsd-verify-work` once all gap closures done
-- **Progress:** [████████░░] 77%
-- **Next action:** Run `/gsd-execute-phase 01-foundation` to execute 01-U, 01-V, 01-W, 01-X, 01-Y, 01-Z gap closures, then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration).
+- **Plans:** 21/26 plans complete (01-A..01-S, 01-O, 01-T, 01-U); Phase 1 gap-closure batch in progress (U, V, W, X, Y, Z)
+- **Status:** Phase 1 81% complete (gap-closure batch executing); ready for `/gsd-verify-work` once all gap closures done
+- **Progress:** [████████░░] 81%
+- **Next action:** Run `/gsd-execute-phase 01-foundation` to execute 01-V, 01-W, 01-X, 01-Y, 01-Z gap closures, then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
 
@@ -71,6 +71,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 01 PN | 5 | 1 tasks | 2 files |
 | Phase 01 PO | 5 | 1 tasks | 1 files |
 | Phase 1 PT | 5 | 1 tasks | 1 files |
+| Phase 1 PU | 5 | 1 tasks | 1 files |
 
 ## Decisions Log (from executed plans)
 
@@ -105,6 +106,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-21 | 01-N deviation Rule 4: Task 2 (Agent-constructor `requireToolApproval` wiring) ROLLED BACK — Mastra 1.60's `AgentConfigBase` does not expose `requireToolApproval` as a top-level field. TypeScript rejects with TS2353 ("Object literal may only specify known properties"); runtime Agent constructor never reads `config.requireToolApproval` (verified against `node_modules/.pnpm/@mastra+core@1.60.0_*/node_modules/@mastra/core/dist/agent-BVtn9FqD.cjs` lines 32200-32360). Task 1 observability hooks shipped ([approval-resolver] in toolApprovalResolver body, [chat-debug] per-chunk in chat for-await loop). Alternative fix `defaultOptions: { requireToolApproval: toolApprovalResolver }` IS valid in 1.60 (deepMerge'd into per-call options at agent-BVtn9FqD.cjs:37176) and noted for a follow-up plan IF operator confirms Candidate A from `.planning/debug/write-low-card-not-shown.md`. | 01-N |
 | 2026-08-21 | G-1-9 closed: toolApprovalResolver reads approvalMode via `rc.getRaw?.("approvalMode") ?? rc.approvalMode` — defensive read covering Mastra 1.60's RequestContext class instance (private Map; values only via `.getRaw(key)`) AND any future plain-object shape. Property access previously always returned undefined so 'tiered' and 'always' both fell through to the gate path; the toggle contrast is now reachable through the resolver. Implements HITL-02 end-to-end. | 01-O |
 | 2026-08-21 | G-1-14b closed: toolApprovalResolver normalizes tools:{} property keys (ragQueryTool → ragQuery, etc.) before calling classify/resolveApproval — 2-line `normalizeToolName` helper strips trailing "Tool" suffix. Read tools (echo, rag_query) no longer fall through to write_high; resolver returns false → Mastra 1.60 no longer suspends the workflow before tool execution; rag_query tool result reaches the client. Implements HITL-01 + RAG-02. | 01-T |
+| 2026-08-21 | G-1-12b closed: DefaultChatTransport body changed from static `{ approvalMode, sessionId }` to function form `() => ({ approvalMode, sessionId })` so `resolve()` re-reads the React closure on every sendMessage. @ai-sdk/react useChat captures the Chat (and transport) ONCE in useRef on first render — the captured transport's body closure held `sessionId=""` for the Chat instance lifetime, so every sendMessage POSTed `sessionId=''`. Worker `setAuditSessionId("")` → `?? 'anon'` (?? doesn't trigger on empty string) → audit_log rows for chat-driven tool calls carried `session_id='anon'` instead of the browser sessionId. The function form is evaluated at request time via http-chat-transport:149 `await resolve(this.body)`. Worker side at worker/src/index.ts:89-93 was already correct; only the client body capture was broken. Implements UI-04 (session persists across refresh + threads sessionId to audit) and BCK-04 (audit_log rows anchored to the right session). | 01-U |
 
 ## Accumulated Context
 
@@ -141,12 +143,12 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-T-PLAN.md — Phase 1 gap-closure G-1-14b: resolver normalizes tools:{} property keys before classify (ragQuery/echo/createNote/applyMigrations)
+**Stopped at:** Completed 01-U-PLAN.md — Phase 1 gap-closure G-1-12b: DefaultChatTransport body is now a function form so post-mount setSessionId(fresh) propagates to /api/chat POSTs (was captured at first render with sessionId='', falling through to 'anon' in audit_log)
 **Resume file:** None
 
-**Last session:** 2026-08-21T14:54:44.517Z
+**Last session:** 2026-08-21T15:03:20.000Z
 
-**Resume command:** `/gsd-execute-phase 01-foundation` to continue gap-closure batch (01-U, 01-V, 01-W, 01-X, 01-Y, 01-Z), then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration)
+**Resume command:** `/gsd-execute-phase 01-foundation` to continue gap-closure batch (01-V, 01-W, 01-X, 01-Y, 01-Z), then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration)
 
 **Next phase to plan:** Phase 2 — Notion MCP Integration
 
