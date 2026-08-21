@@ -130,6 +130,13 @@ export const mastra = new Mastra({
               const msgId = crypto.randomUUID();
               let lastToolName = "sdlcAgent";
               let textCount = 0;
+              // 01-X — true if the for-await loop saw a tool-call-approval chunk. Mastra
+              // 1.60's workflowLoopStream closes its controller without error on suspend
+              // (agent-BVtn9FqD.cjs:27282 — safeClose), so the for-await loop exits normally
+              // for BOTH successful AND suspended runs. Without this flag, the translator
+              // emits `finish` either way — misleading the client into thinking the
+              // assistant response completed when it's actually waiting for user approval.
+              let sawApprovalChunk = false;
               try {
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ type: "start", messageId: msgId, messageMetadata: { modelId: "opencode-go/hy3" } })}\n\n`),
@@ -165,6 +172,10 @@ export const mastra = new Mastra({
                   } else if (chunk.type === "tool-call-approval") {
                     const p = chunk.payload as { toolCallId?: string } | undefined;
                     const toolCallId = p?.toolCallId ?? crypto.randomUUID();
+                    // 01-X — mark that the upstream gate fired; the for-await loop will exit
+                    // without error (controller.close, not throw) and the terminator below
+                    // branches on this flag to emit `suspended` instead of `finish`.
+                    sawApprovalChunk = true;
                     controller.enqueue(
                       encoder.encode(`data: ${JSON.stringify({ type: "tool-approval-request", approvalId: toolCallId, toolCallId })}\n\n`),
                     );
@@ -191,10 +202,23 @@ export const mastra = new Mastra({
                     }
                   }
                 }
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "finish" })}\n\n`));
+                if (sawApprovalChunk) {
+                  // ponytail: AI SDK v5 has no `suspended` chunk type — emit `finish` so the
+                  // client's parser accepts the terminator, plus a custom data chunk the
+                  // client (plan 01-Y) reads to know the response is awaiting approval.
+                  // The data chunk uses the existing `data-...` part shape so the AI SDK
+                  // stores it on m.parts[i].data without rejecting the stream.
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "finish" })}\n\n`));
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ type: "data-suspended", data: { reason: "tool-call-approval", toolName: lastToolName } })}\n\n`),
+                  );
+                  console.log(`[chat-debug] suspended text=${textCount} tool=${lastToolName}`);
+                } else {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "finish" })}\n\n`));
+                  console.log(`[chat-debug] ok text=${textCount} tool=${lastToolName}`);
+                }
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 controller.close();
-                console.log(`[chat-debug] ok text=${textCount} tool=${lastToolName}`);
               } catch (e) {
                 console.log(`[chat-debug] err text=${textCount} msg=${e instanceof Error ? e.message : String(e)}`);
                 try {
