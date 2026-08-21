@@ -129,3 +129,11 @@ None — no external service configuration required.
 
 *Phase: 01-foundation*
 *Completed: 2026-08-21*
+
+## Self-Check: PASSED
+
+- 01-T-SUMMARY.md present at .planning/phases/01-foundation/01-T-SUMMARY.md
+- Commits verified: `4be52d3` (fix sdlc.ts), `9ccd5fb` (docs SUMMARY), `92ff150` (docs STATE+ROADMAP)
+- All plan grep verifications passed (normalizeToolName defined, applied, resolveApproval(toolName, ...) used, raw key absent, [approval-resolver] preserved, getRaw pattern preserved)
+- `pnpm tsc --noEmit` introduced 0 new errors in sdlc.ts (2 pre-existing errors in lib/insforge.ts confirmed via stash round-trip)
+- Acceptance criteria all met
