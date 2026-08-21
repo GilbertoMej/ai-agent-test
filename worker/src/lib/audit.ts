@@ -7,6 +7,17 @@ import { classify, type ToolClass } from "./classify";
 
 export { classify, type ToolClass };
 
+// Module-scope sessionId carrier. Mastra 1.60's tool runner invokes
+// createTool({execute}).execute(args) with a single arg — no ctx carrying
+// requestContext. The stream route calls setAuditSessionId(sessionId) before
+// agent.stream() so withAudit can read the value via resolveSessionId().
+// This is a per-request set — the stream route MUST call it before every
+// agent.stream() to avoid cross-session bleed.
+let currentSessionId: string | undefined;
+export function setAuditSessionId(sessionId: string | undefined): void {
+  currentSessionId = sessionId;
+}
+
 // Optional fields a tool can attach to its audit_log row (01-05).
 // rag_query populates tool_doc_rows_consumed; future tools can extend.
 export type AuditExtras = { tool_doc_rows_consumed?: number };
@@ -37,20 +48,28 @@ export function withAudit<TArgs, TRet>(
         console.log(`audit: ${toolId} -> ${redactedResult}`);
       }
       const extras: AuditExtras = (out as Partial<AuditExtras>) ?? {};
-      await db.insert(auditLog).values({
-        id: nanoid(),
-        session_id: sessionId,
-        tool_name: toolId,
-        args_json: redact(args),
-        result_status: status,
-        approval_decision: classification === "read" ? "auto" : null,
-        duration_ms: Date.now() - start,
-        tool_doc_rows_consumed: extras.tool_doc_rows_consumed ?? null,
-        // Default tokens to 0 so the column is IS NOT NULL even before patchTokens() runs.
-        // patchTokens() updates the most-recent row for (session_id, tool_name) on step-finish.
-        tokens_in: 0,
-        tokens_out: 0,
-      });
+      try {
+        await db.insert(auditLog).values({
+          id: nanoid(),
+          session_id: sessionId,
+          tool_name: toolId,
+          args_json: redact(args),
+          result_status: status,
+          approval_decision: classification === "read" ? "auto" : null,
+          duration_ms: Date.now() - start,
+          tool_doc_rows_consumed: extras.tool_doc_rows_consumed ?? null,
+          // Default tokens to 0 so the column is IS NOT NULL even before patchTokens() runs.
+          // patchTokens() updates the most-recent row for (session_id, tool_name) on step-finish.
+          tokens_in: 0,
+          tokens_out: 0,
+        });
+      } catch (e) {
+        // ponytail: surface the failure loudly; do NOT re-throw — the tool has
+        // already returned to the caller, and the chat stream must not break.
+        // Without this, audit INSERT failures are silent (the stream outer
+        // try/catch only console.logs and the row is missing from audit_log).
+        console.error(`audit: insert failed tool=${toolId} session=${sessionId}`, e);
+      }
     }
   };
 }
@@ -63,6 +82,10 @@ export type AuditToolContext = {
 };
 
 function resolveSessionId(ctx: AuditToolContext | undefined): string {
+  // Module-scope (set per-request by the stream route) wins over ctx.
+  // Mastra 1.60's tool runner never delivers a 2nd-arg ctx to execute(),
+  // so this is the path that actually fires in production.
+  if (currentSessionId) return currentSessionId;
   if (ctx?.sessionId) return ctx.sessionId;
   const rc = ctx?.requestContext as { get?: (key: string) => unknown } | undefined;
   const fromRc = rc?.get?.("sessionId");

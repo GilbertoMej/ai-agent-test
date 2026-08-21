@@ -9,7 +9,7 @@ import { PostgresStore } from "@mastra/pg";
 import { registerApiRoute } from "@mastra/core/server";
 import { sdlcAgent, toolApprovalResolver } from "./agents/sdlc";
 import { healthRoute } from "./lib/health";
-import { patchTokens } from "./lib/audit";
+import { patchTokens, setAuditSessionId } from "./lib/audit";
 import { maybeRefreshEmbeddings } from "./lib/embed-bootstrap";
 import { registerApprovalRoutes, getApprovalHandlers } from "./lib/approval-route";
 import type { ApprovalPayload } from "./lib/approval-route";
@@ -87,6 +87,10 @@ export const mastra = new Mastra({
             sessionId?: string;
           };
           const { messages, threadId, approvalMode, sessionId } = body;
+          // 01-R — withAudit reads sessionId from this module-scope carrier. Mastra
+          // 1.60's tool runner invokes createTool({execute}).execute(args) with a
+          // single arg, so withAudit's optional ctx arg is always undefined here.
+          setAuditSessionId(sessionId);
           const agent = c.get("mastra").getAgent("sdlcAgent");
           // 01-chat-debug: browser sends AI SDK v5 UIMessage[] (parts-format). Mastra 1.60
           // agent.stream expects MessageListInput — pass ModelMessage[] via convertToModelMessages.
