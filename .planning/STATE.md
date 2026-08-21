@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: "Completed 01-V-PLAN.md — Phase 1 gap-closure G-1-11b: useChat now seeds its internal messages array via setMessages (called inside the mount-fetch's .then handler with the fetched snapshot); the `messages` prop is one-shot, so the prior `initialMessages` state + seed prop are retired. After close+reopen with a stored sessionId, the chat panel renders the prior messages above the input."
-last_updated: "2026-08-21T15:12:28.000Z"
+stopped_at: "Completed 01-W-PLAN.md — Phase 1 gap-closure G-1-7b: ChatPanel's approval-renderer filter swapped from a non-existent top-level `tool-approval-request` part type to the AI SDK v7 wire reality (`tool-<name>` part with `state === 'approval-requested'` + `approval.isAutomatic` guard); toolName/input read directly from the tool part (no separate lookup); dead type alias + helper retired; type-checker reports zero new errors."
+last_updated: "2026-08-21T15:29:46.000Z"
 progress:
   total_phases: 1
   completed_phases: 1
   total_plans: 26
-  completed_plans: 22
-current_plan: V
+  completed_plans: 23
+current_plan: W
 total_plans: 26
 ---
 
@@ -30,10 +30,10 @@ total_plans: 26
 ## Current Position
 
 - **Phase:** 2 — Notion MCP Integration
-- **Plans:** 22/26 plans complete (01-A..01-S, 01-O, 01-T, 01-U, 01-V); Phase 1 gap-closure batch in progress (V done; W, X, Y, Z remaining)
-- **Status:** Phase 1 85% complete (gap-closure batch executing); ready for `/gsd-verify-work` once all gap closures done
-- **Progress:** [████████░░] 85%
-- **Next action:** Run `/gsd-execute-phase 01-foundation` to execute 01-W, 01-X, 01-Y, 01-Z gap closures, then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration).
+- **Plans:** 23/26 plans complete (01-A..01-S, 01-O, 01-T, 01-U, 01-V, 01-W); Phase 1 gap-closure batch in progress (W done; X, Y, Z remaining)
+- **Status:** Phase 1 88% complete (gap-closure batch executing); ready for `/gsd-verify-work` once all gap closures done
+- **Progress:** [█████████░] 88%
+- **Next action:** Run `/gsd-execute-phase 01-foundation` to execute 01-X, 01-Y, 01-Z gap closures, then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
 
@@ -73,6 +73,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 1 PT | 5 | 1 tasks | 1 files |
 | Phase 1 PU | 5 | 1 tasks | 1 files |
 | Phase 1 PV | 9 | 1 tasks | 1 files |
+| Phase 1 PW | 11 | 1 tasks | 1 files |
 
 ## Decisions Log (from executed plans)
 
@@ -109,6 +110,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-21 | G-1-14b closed: toolApprovalResolver normalizes tools:{} property keys (ragQueryTool → ragQuery, etc.) before calling classify/resolveApproval — 2-line `normalizeToolName` helper strips trailing "Tool" suffix. Read tools (echo, rag_query) no longer fall through to write_high; resolver returns false → Mastra 1.60 no longer suspends the workflow before tool execution; rag_query tool result reaches the client. Implements HITL-01 + RAG-02. | 01-T |
 | 2026-08-21 | G-1-12b closed: DefaultChatTransport body changed from static `{ approvalMode, sessionId }` to function form `() => ({ approvalMode, sessionId })` so `resolve()` re-reads the React closure on every sendMessage. @ai-sdk/react useChat captures the Chat (and transport) ONCE in useRef on first render — the captured transport's body closure held `sessionId=""` for the Chat instance lifetime, so every sendMessage POSTed `sessionId=''`. Worker `setAuditSessionId("")` → `?? 'anon'` (?? doesn't trigger on empty string) → audit_log rows for chat-driven tool calls carried `session_id='anon'` instead of the browser sessionId. The function form is evaluated at request time via http-chat-transport:149 `await resolve(this.body)`. Worker side at worker/src/index.ts:89-93 was already correct; only the client body capture was broken. Implements UI-04 (session persists across refresh + threads sessionId to audit) and BCK-04 (audit_log rows anchored to the right session). | 01-U |
 | 2026-08-21 | G-1-11b closed: ChatPanel drops the `initialMessages` useState and the `messages: initialMessages` seed prop. useChat's `messages` prop is the INITIAL SEED captured at hook construction — subsequent prop changes do not update the internal array (standard React hook semantics, also documented in UseChatHelpers at @ai-sdk/react/dist/index.d.ts:25 for the `setMessages` setter). The mount-fetch's `.then` handler now calls `setMessages(body.messages as UIMessage[])` to push the fetched snapshot into useChat's internal messages array; the panel renders the prior messages on next render. Closes the secondary "beacon staleness" bug too: the ref-mirror effect (`useEffect(() => { messagesRef.current = messages; }, [messages])`) fires on the populated array, so `usePauseOnUnload(sessionId, messagesRef.current)` closes over a fresh-by-one-render-but-now-populated snapshot at unload time. Empty-deps mount effect now lists `setMessages` (stable reference across renders). 01-U's body function form preserved (no G-1-12b regression). Implements UI-04 end-to-end (close+reopen restores chat). | 01-V |
+| 2026-08-21 | G-1-7b closed: ChatPanel's approval-renderer filter swapped from `p.type !== "tool-approval-request"` to `!tp.type.startsWith("tool-") || tp.state !== "approval-requested"` + `tp.approval?.isAutomatic` guard. AI SDK v7's chunk reducer at `node_modules/.pnpm/ai@7.0.68_zod@4.4.3/node_modules/ai/src/ui/process-ui-message-stream.ts:746-758` MUTATES the existing `tool-<toolName>` part (looked up by `toolCallId`) to `{ state: 'approval-requested', approval: { id: approvalId } }` — no new top-level part is pushed. The old filter matched zero parts every turn; the new filter reads the same dimension ActionFeed.tsx:46-65 already uses. toolName/input/approval.id read directly from the tool part — no separate tool-part lookup needed. Dead code retired: `ApprovalRequestPart` + `ToolPart` type aliases and `lookupToolPart` helper (scaffolding for a part type that never existed on the wire). React key uses `tp.toolCallId` (stable across re-renders). `decide()` (lines 156-186) unchanged — its existing `ToolApprovalPart` parameter accepts the new approvalPart literal as-is. TypeScript: zero new errors in ChatPanel.tsx. Implements HITL-01 end-to-end (createNote → write_low card; applyMigrations → red-bordered write_high card with DESTRUCTIVE badge + CONFIRM input). | 01-W |
 
 ## Accumulated Context
 
@@ -145,12 +147,12 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-V-PLAN.md — Phase 1 gap-closure G-1-11b: useChat now seeds its internal messages array via setMessages (called inside the mount-fetch's .then handler with the fetched snapshot); the `messages` prop is one-shot, so the prior `initialMessages` state + seed prop are retired. After close+reopen with a stored sessionId, the chat panel renders the prior messages above the input.
+**Stopped at:** Completed 01-W-PLAN.md — Phase 1 gap-closure G-1-7b: ChatPanel's approval-renderer filter swapped from a non-existent top-level `tool-approval-request` part type to the AI SDK v7 wire reality (`tool-<name>` part with `state === 'approval-requested'` + `approval.isAutomatic` guard); toolName/input read directly from the tool part (no separate lookup); dead type alias + helper retired; type-checker reports zero new errors.
 **Resume file:** None
 
-**Last session:** 2026-08-21T15:12:28.000Z
+**Last session:** 2026-08-21T15:29:46.000Z
 
-**Resume command:** `/gsd-execute-phase 01-foundation` to continue gap-closure batch (01-W, 01-X, 01-Y, 01-Z), then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration)
+**Resume command:** `/gsd-execute-phase 01-foundation` to continue gap-closure batch (01-X, 01-Y, 01-Z), then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration)
 
 **Next phase to plan:** Phase 2 — Notion MCP Integration
 
