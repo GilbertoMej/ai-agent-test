@@ -3,6 +3,7 @@ import type { ToolApprovalContext } from "@mastra/core/tools";
 import { echoTool } from "../tools/echo";
 import { createNoteTool } from "../tools/create-note";
 import { applyMigrationsTool } from "../tools/apply-migrations";
+import { ragQueryTool } from "../tools/rag-query";
 import { resolveApproval, loadActiveGrants, type ApprovalMode } from "../lib/approval";
 
 // D-02: OpenCode Zen Go provider. Iterated from Nemotron 3 Ultra (premature stream close)
@@ -18,10 +19,12 @@ export const sdlcAgent = new Agent({
   name: "SDLC Agent",
   instructions:
     "You are the SDLC Playground agent. For Phase 1 (Walking Skeleton), you have echo (read), " +
-    "createNote (write_low), and applyMigrations (write_high). Use createNote when the user asks for a note; " +
-    "use applyMigrations when the user asks to migrate. For everything else, answer from chat.",
+    "rag_query (read), createNote (write_low), and applyMigrations (write_high). " +
+    "Call rag_query BEFORE invoking any MCP tool whose usage you are unsure about — it returns the top-5 tool_docs rows relevant to the user's request. " +
+    "Use createNote when the user asks for a note; use applyMigrations when the user asks to migrate. " +
+    "For everything else, answer from chat.",
   model: "opencode-go/hy3",
-  tools: { echoTool, createNoteTool, applyMigrationsTool },
+  tools: { echoTool, createNoteTool, applyMigrationsTool, ragQueryTool },
 });
 
 // Per-call `requireToolApproval` resolver (Mastra 1.60 signature).
