@@ -90,3 +90,19 @@ All plan acceptance criteria met:
 
 - Root-cause trace: `.planning/debug/g-1-12-audit-log-empty.md`
 - Pattern note (Mastra 1.60 tool-runner single-arg call): `worker/src/lib/audit.ts` lines 10-15 module-scope carrier comment
+
+## Self-Check: PASSED
+
+Verified:
+
+- `.planning/phases/01-foundation/01-R-SUMMARY.md` exists on disk (1 file, 4979 bytes diff for task commit)
+- Task commit `42e8cf6` present in `git log` on `dev`
+- Metadata commit `b2915c5` present in `git log` on `dev` (SUMMARY + STATE + ROADMAP)
+- All 5 grep verifications per PLAN.md `<verify>` block:
+  - `export function setAuditSessionId` in `worker/src/lib/audit.ts` — 1 match (line 17)
+  - `currentSessionId` in `worker/src/lib/audit.ts` — 3 matches (lines 16, 18, 88); required 2+
+  - `audit: insert failed` in `worker/src/lib/audit.ts` — 1 match (line 71)
+  - `setAuditSessionId(sessionId)` in `worker/src/index.ts` — 1 match (line 93)
+  - `import { ... setAuditSessionId ... } from "./lib/audit"` in `worker/src/index.ts` — 1 match (line 12)
+- `pnpm tsc --noEmit` — 0 new errors in `worker/src/lib/audit.ts` or `worker/src/index.ts` (2 pre-existing errors in `lib/insforge.ts` tracked for post-Phase-1 cleanup per STATE.md carryover)
+- `pnpm test:audit` — 5/5 tests pass, no regression
