@@ -23,9 +23,16 @@ interface PausePayload {
 interface SuspendedRun {
   pausedAt: number;
   messages: StoredMessage[];
+  // 01-Y — runId stashed by the chat translator when a tool-call-approval chunk fires.
+  // Keyed by `${sessionId}::${toolCallId}` (composite), separate from the sessionId
+  // entries pause.ts writes. /approval/approve + /approval/decline handlers look this
+  // up to resume the suspended run via agent.approveToolCall({runId, toolCallId}).
+  runId?: string;
 }
 
-const suspendedRuns = new Map<string, SuspendedRun>();
+// 01-Y — exported so worker/src/index.ts (translator) and worker/src/lib/approval-route.ts
+// (resume handlers) can read/write the same Map without an indirection layer.
+export const suspendedRuns = new Map<string, SuspendedRun>();
 
 export function listSuspendedRuns(): Array<{ sessionId: string; pausedAt: number }> {
   return Array.from(suspendedRuns.entries()).map(([sessionId, v]) => ({ sessionId, pausedAt: v.pausedAt }));

@@ -162,6 +162,13 @@ export function ChatPanel() {
   const decide = async (decision: "approve" | "decline", part: ToolApprovalPart, pattern?: string) => {
     const url = decision === "approve" ? "/api/approve" : "/api/decline";
     try {
+      // 01-Y — worker resumes the suspended run server-side and pipes the
+      // MastraModelOutput.fullStream back as SSE. The streamed body carries
+      // tool-result + assistant follow-up text; we don't read it in this
+      // React tree (useChat owns the chat transport, and a second concurrent
+      // stream would fight the parser). Instead, reload the page — the
+      // post-mount useEffect's fetch /api/messages populates useChat with
+      // the resumed state, and the user sees the result.
       await withTransientRetry(
         () =>
           fetch(url, {
@@ -182,13 +189,13 @@ export function ChatPanel() {
       setToast(`Failed to ${decision}: ${(e as Error).message}`);
       return;
     }
-    // Resume: send a follow-up so the agent re-runs the now-approved tool.
-    await sendMessage({
-      text:
-        decision === "approve"
-          ? `Continue with ${part.toolName} (approved).`
-          : `Skip ${part.toolName} (denied).`,
-    });
+    // ponytail: window.location.reload() instead of a second sendMessage —
+    // Phase 8 swaps this for a streaming-aware chat pattern that consumes
+    // the resumed stream inline. The page-refresh loses any in-flight typing
+    // (acceptable for a single-user Phase 1 demo).
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
   };
 
   return (

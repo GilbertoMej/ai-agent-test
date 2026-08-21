@@ -13,7 +13,7 @@ import { patchTokens, setAuditSessionId } from "./lib/audit";
 import { maybeRefreshEmbeddings } from "./lib/embed-bootstrap";
 import { registerApprovalRoutes, getApprovalHandlers } from "./lib/approval-route";
 import type { ApprovalPayload } from "./lib/approval-route";
-import { pauseRoute, getSuspendedMessages } from "./api-routes/pause";
+import { pauseRoute, getSuspendedMessages, suspendedRuns } from "./api-routes/pause";
 import { resumeRoute, suspendedListRoute } from "./api-routes/resume";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
@@ -55,13 +55,19 @@ export const mastra = new Mastra({
       }),
       // 01-04 + 01-11 — approval/decline endpoints. Bearer auth via WORKER_SHARED_SECRET
       // is enforced by the Next.js routes; the worker trusts the call.
+      // 01-Y — approve/decline now pipe the resumed MastraModelOutput.fullStream back
+      // as SSE (a Response, not a JSON-serializable object). When the handler returns
+      // a Response, pass it through directly; otherwise fall back to c.json (used by
+      // the 404/503 error paths).
       registerApiRoute("/approval/approve", {
         method: "POST",
         handler: async (c) => {
           const body = (await c.req.json().catch(() => ({}))) as ApprovalPayload;
           const handlers = getApprovalHandlers(mastra);
           if (!handlers) return c.json({ ok: false, error: "approval not registered" });
-          return c.json(await handlers.approve(body));
+          const result = await handlers.approve(body);
+          if (result instanceof Response) return result;
+          return c.json(result);
         },
       }),
       registerApiRoute("/approval/decline", {
@@ -70,7 +76,9 @@ export const mastra = new Mastra({
           const body = (await c.req.json().catch(() => ({}))) as ApprovalPayload;
           const handlers = getApprovalHandlers(mastra);
           if (!handlers) return c.json({ ok: false, error: "approval not registered" });
-          return c.json(await handlers.decline(body));
+          const result = await handlers.decline(body);
+          if (result instanceof Response) return result;
+          return c.json(result);
         },
       }),
       // 01-E2 — custom POST /agents/sdlcAgent/stream route. Wires toolApprovalResolver
@@ -176,6 +184,18 @@ export const mastra = new Mastra({
                     // without error (controller.close, not throw) and the terminator below
                     // branches on this flag to emit `suspended` instead of `finish`.
                     sawApprovalChunk = true;
+                    // 01-Y — stash (sessionId, toolCallId) → runId so /approval/approve can
+                    // call agent.approveToolCall({runId, toolCallId}) to resume the suspended
+                    // run. MastraModelOutput.runId (output.d.ts:88) is stable across the
+                    // suspended-then-resumed lifetime. Composite key avoids collision with
+                    // pause.ts's sessionId-keyed entries (separate concern, same Map).
+                    if (stream.runId) {
+                      suspendedRuns.set(`${sessionId}::${toolCallId}`, {
+                        pausedAt: Date.now(),
+                        messages: [],
+                        runId: stream.runId,
+                      });
+                    }
                     controller.enqueue(
                       encoder.encode(`data: ${JSON.stringify({ type: "tool-approval-request", approvalId: toolCallId, toolCallId })}\n\n`),
                     );
