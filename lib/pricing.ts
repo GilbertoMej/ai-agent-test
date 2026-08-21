@@ -17,10 +17,12 @@ export const PRICING: Record<ModelId, PriceRow> = {
     outputPerMTok: 0.153,
     display: "$0.077 / $0.153 per 1M",
   },
-  // D-02 successor (post-G-1-6) — OpenCode Go hy3 model. Per-token rates are
-  // unverified for Phase 1; default to $0/$0 until operator confirms the tier
-  // (https://opencode.dev/pricing). The PRICING row is present so ModelId union
-  // compiles and estimateCostUsd never throws on missing key.
+  // ponytail: opencode-go/hy3 is the Anthropic-hosted research-preview tier for
+  // Phase 1 — free, no published per-token rate (verified at
+  // platform.claude.com/docs/en/about-claude/pricing on 2026-08-21; the
+  // Anthropic pricing page lists no entry for this model). Cost counter shows
+  // $0.00 intentionally. Update with real rates when a paid-tier model is added
+  // (Phase 2+); 01-Z-SUMMARY.md records this as an accept-as-design decision.
   "opencode-go/hy3": { inputPerMTok: 0, outputPerMTok: 0, display: "$0 (free tier — verify)" },
 };
 
