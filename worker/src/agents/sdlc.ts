@@ -33,8 +33,18 @@ export const sdlcAgent = new Agent({
 export async function toolApprovalResolver(
   ctx: ToolApprovalContext,
 ): Promise<boolean> {
-  const rc = (ctx.requestContext ?? {}) as { approvalMode?: ApprovalMode };
+  // Mastra 1.60 passes the RequestContext class instance at runtime — values
+  // live in a private Map and are reachable only via .getRaw(key). Property
+  // access always returns undefined. The .approvalMode fallback covers the
+  // plain-object shape that the SDK type docstring promises, in case a future
+  // version switches to it.
+  const rc = (ctx.requestContext ?? {}) as {
+    getRaw?: (k: string) => unknown;
+    approvalMode?: ApprovalMode;
+  };
+  const raw = rc.getRaw?.("approvalMode");
+  const approvalMode = (raw ?? rc.approvalMode) as ApprovalMode | undefined;
   const grants = await loadActiveGrants();
-  console.log(`[approval-resolver] tool=${ctx.toolName} mode=${rc.approvalMode ?? "undef"}`);
-  return resolveApproval(ctx.toolName, { approvalMode: rc.approvalMode, grants }) === "always";
+  console.log(`[approval-resolver] tool=${ctx.toolName} mode=${approvalMode ?? "undef"}`);
+  return resolveApproval(ctx.toolName, { approvalMode, grants }) === "always";
 }
