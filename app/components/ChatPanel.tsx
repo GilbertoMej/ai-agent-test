@@ -75,6 +75,8 @@ export function ChatPanel() {
   const [sessionId, setSessionId] = useState<string>("");
   const [input, setInput] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ref mirror of `messages` so usePauseOnUnload sees the latest array at unload time.
   const messagesRef = useRef<UIMessage[]>([]);
@@ -105,6 +107,44 @@ export function ChatPanel() {
     if (!input.trim() || isLoading) return;
     sendMessage({ text: input });
     setInput("");
+  };
+
+  // Upload dropped/selected .md files → /api/ingest → tool_docs (chunked + embedded).
+  // Separate from the chat stream: it seeds RAG, it does not call the agent.
+  const uploadFiles = async (files: FileList | File[]) => {
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    let ok = 0;
+    const summaries: string[] = [];
+    for (const f of arr) {
+      if (!/\.(md|markdown|txt|text)$/i.test(f.name)) {
+        setToast(`Skipped ${f.name}: only .md/.markdown/.txt`);
+        continue;
+      }
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        const r = await fetch("/api/ingest", { method: "POST", body: fd });
+        const j = (await r.json()) as {
+          ok?: boolean;
+          error?: string;
+          tool?: string;
+          inserted?: number;
+          embedded?: number;
+        };
+        if (r.ok && j.ok) {
+          ok++;
+          summaries.push(`${j.tool} (+${j.inserted}, ${j.embedded} embedded)`);
+        } else {
+          setToast(`Ingest failed (${f.name}): ${j.error ?? r.status}`);
+        }
+      } catch (e) {
+        setToast(`Ingest failed (${f.name}): ${(e as Error).message}`);
+      }
+    }
+    if (ok > 0) {
+      setToast(`Ingested ${ok} doc(s) into tool_docs: ${summaries.join(", ")}`);
+    }
   };
 
   const [err, setErr] = useState<string | null>(null);
@@ -208,10 +248,17 @@ export function ChatPanel() {
         </div>
       </div>
       <div
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
+        }}
         style={{
           minHeight: 240,
           padding: 12,
-          border: "1px solid #2a2f3a",
+          border: `1px ${dragActive ? "dashed" : "solid"} ${dragActive ? "#3a86ff" : "#2a2f3a"}`,
           borderRadius: 8,
           background: "#161922",
           overflowY: "auto",
@@ -219,7 +266,7 @@ export function ChatPanel() {
       >
         {messages.length === 0 && (
           <p style={{ color: "#8b94a7", margin: 0 }}>
-            Type &quot;hello&quot; (read), &quot;create a note&quot; (write_low), or &quot;apply migrations&quot; (write_high).
+            Type &quot;hello&quot; (read), &quot;create a note&quot; (write_low), or &quot;apply migrations&quot; (write_high). Drag a .md file here or hit Upload to add docs to RAG.
           </p>
         )}
         {messages.map((m) => {
@@ -316,6 +363,31 @@ export function ChatPanel() {
             color: "#e6e6e6",
           }}
         />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md,.markdown,.txt,.text"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => {
+            if (e.target.files) uploadFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 6,
+            border: "1px solid #3a4256",
+            background: "#222a3a",
+            color: "#e6e6e6",
+            cursor: "pointer",
+          }}
+        >
+          Upload
+        </button>
         <button
           type="submit"
           disabled={isLoading}
