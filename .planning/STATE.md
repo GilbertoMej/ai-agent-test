@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: "Completed 01-X-PLAN.md — Phase 1 gap-closure G-1-15a: worker translator distinguishes approval-pending (`data-suspended` side-car) from assistant-completed (`finish` only) via sawApprovalChunk flag; the suspended path emits `finish` + a `data-suspended` DataUIMessageChunk (data: { reason: 'tool-call-approval', toolName }) so the 01-Y resume handler can tell which terminator fired; ponytail: kept `finish` on the suspended path because AI SDK v5 has no `suspended` UIMessageChunk type — the side-car rides the `data-` DataUIMessageChunk part shape so the parser accepts the stream."
-last_updated: "2026-08-21T16:05:00.000Z"
+stopped_at: "Completed 01-Y-PLAN.md — Phase 1 gap-closure G-1-15 (resume round-trip): worker /approval/approve + /approval/decline handlers now call agent.approveToolCall / agent.declineToolCall with stashed runId from suspendedRuns (composite ${sessionId}::${toolCallId} key, runId set by the tool-call-approval chunk translator at index.ts:193); resumed MastraModelOutput.fullStream is piped back as SSE via inlined translator (drops tool-call-approval branch + sawApprovalChunk flag because the gate is cleared). ChatPanel decide() POSTs the existing body and reloads the page; Next proxies /api/approve + /api/decline forward upstream.body verbatim as text/event-stream. Deviations: (1) replaced module-scope approvalAgent with mastra.getAgent() in closure to dodge CJS circular-import bind-at-require-time trap (Rule 2), (2) corrected MastraModelOutput import path to @mastra/core/stream per scope_notes (Rule 3), (3) rewrote Next proxies to forward SSE body (plan said verify only) (Rule 3), (4) dropped unused classify import after handler rewrite (Rule 1)."
+last_updated: "2026-08-21T16:18:00.000Z"
 progress:
   total_phases: 1
   completed_phases: 1
   total_plans: 26
-  completed_plans: 24
-current_plan: X
+  completed_plans: 25
+current_plan: Y
 total_plans: 26
 ---
 
@@ -30,10 +30,10 @@ total_plans: 26
 ## Current Position
 
 - **Phase:** 2 — Notion MCP Integration
-- **Plans:** 23/26 plans complete (01-A..01-S, 01-O, 01-T, 01-U, 01-V, 01-W); Phase 1 gap-closure batch in progress (W done; X, Y, Z remaining)
-- **Status:** Phase 1 88% complete (gap-closure batch executing); ready for `/gsd-verify-work` once all gap closures done
-- **Progress:** [█████████░] 88%
-- **Next action:** Run `/gsd-execute-phase 01-foundation` to execute 01-X, 01-Y, 01-Z gap closures, then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration).
+- **Plans:** 24/26 plans complete (01-A..01-S, 01-O, 01-T, 01-U, 01-V, 01-W, 01-X, 01-Y); Phase 1 gap-closure batch in progress (W, X, Y done; Z remaining)
+- **Status:** Phase 1 96% complete (gap-closure batch almost done); ready for `/gsd-verify-work` once 01-Z gap closure lands
+- **Progress:** [█████████░] 96%
+- **Next action:** Run `/gsd-execute-phase 01-foundation` to execute 01-Z gap closure, then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
 
@@ -74,6 +74,8 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 1 PU | 5 | 1 tasks | 1 files |
 | Phase 1 PV | 9 | 1 tasks | 1 files |
 | Phase 1 PW | 11 | 1 tasks | 1 files |
+| Phase 1 PX | 5 | 1 tasks | 1 files |
+| Phase 1 PY | 8 | 1 tasks | 6 files |
 
 ## Decisions Log (from executed plans)
 
