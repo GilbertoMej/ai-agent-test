@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: "Completed 01-W-PLAN.md — Phase 1 gap-closure G-1-7b: ChatPanel's approval-renderer filter swapped from a non-existent top-level `tool-approval-request` part type to the AI SDK v7 wire reality (`tool-<name>` part with `state === 'approval-requested'` + `approval.isAutomatic` guard); toolName/input read directly from the tool part (no separate lookup); dead type alias + helper retired; type-checker reports zero new errors."
-last_updated: "2026-08-21T15:29:46.000Z"
+stopped_at: "Completed 01-X-PLAN.md — Phase 1 gap-closure G-1-15a: worker translator distinguishes approval-pending (`data-suspended` side-car) from assistant-completed (`finish` only) via sawApprovalChunk flag; the suspended path emits `finish` + a `data-suspended` DataUIMessageChunk (data: { reason: 'tool-call-approval', toolName }) so the 01-Y resume handler can tell which terminator fired; ponytail: kept `finish` on the suspended path because AI SDK v5 has no `suspended` UIMessageChunk type — the side-car rides the `data-` DataUIMessageChunk part shape so the parser accepts the stream."
+last_updated: "2026-08-21T16:05:00.000Z"
 progress:
   total_phases: 1
   completed_phases: 1
   total_plans: 26
-  completed_plans: 23
-current_plan: W
+  completed_plans: 24
+current_plan: X
 total_plans: 26
 ---
 
