@@ -35,5 +35,6 @@ export async function toolApprovalResolver(
 ): Promise<boolean> {
   const rc = (ctx.requestContext ?? {}) as { approvalMode?: ApprovalMode };
   const grants = await loadActiveGrants();
+  console.log(`[approval-resolver] tool=${ctx.toolName} mode=${rc.approvalMode ?? "undef"}`);
   return resolveApproval(ctx.toolName, { approvalMode: rc.approvalMode, grants }) === "always";
 }

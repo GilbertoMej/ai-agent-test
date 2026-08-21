@@ -135,6 +135,7 @@ export const mastra = new Mastra({
                   encoder.encode(`data: ${JSON.stringify({ type: "start", messageId: msgId, messageMetadata: { modelId: "opencode-go/hy3" } })}\n\n`),
                 );
                 for await (const chunk of stream.fullStream) {
+                  console.log(`[chat-debug] chunk=${chunk.type}`);
                   if (chunk.type === "text-start") {
                     const id = (chunk.payload as { id?: string } | undefined)?.id ?? crypto.randomUUID();
                     controller.enqueue(
