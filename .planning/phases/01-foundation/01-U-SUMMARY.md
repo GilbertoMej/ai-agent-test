@@ -128,3 +128,13 @@ None - no external service configuration required. The fix is purely client-side
 ---
 *Phase: 01-foundation*
 *Completed: 2026-08-21*
+
+## Self-Check: PASSED
+
+- [x] `.planning/phases/01-foundation/01-U-SUMMARY.md` exists on disk
+- [x] Commit `c469f7c` (fix(chat): DefaultChatTransport body → function form) present in git log
+- [x] Commit `baed2a6` (docs(01-U): complete G-1-12b gap-closure plan) present in git log
+- [x] Commit `1329994` (docs(01-U): sync STATE.md + ROADMAP.md) present in git log
+- [x] Final diff (3 commits): ChatPanel.tsx +8/-1, SUMMARY.md +130, STATE.md +14/-10, ROADMAP.md +3/-3
+- [x] Verify checks: function form present (line 103), static form absent, useChat construction intact (line 94), worker files untouched
+- [x] `pnpm tsc --noEmit` introduces no new ChatPanel errors (only pre-existing lib/insforge.ts errors remain)
