@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: "Completed 01-Y-PLAN.md — Phase 1 gap-closure G-1-15 (resume round-trip): worker /approval/approve + /approval/decline handlers now call agent.approveToolCall / agent.declineToolCall with stashed runId from suspendedRuns (composite ${sessionId}::${toolCallId} key, runId set by the tool-call-approval chunk translator at index.ts:193); resumed MastraModelOutput.fullStream is piped back as SSE via inlined translator (drops tool-call-approval branch + sawApprovalChunk flag because the gate is cleared). ChatPanel decide() POSTs the existing body and reloads the page; Next proxies /api/approve + /api/decline forward upstream.body verbatim as text/event-stream. Deviations: (1) replaced module-scope approvalAgent with mastra.getAgent() in closure to dodge CJS circular-import bind-at-require-time trap (Rule 2), (2) corrected MastraModelOutput import path to @mastra/core/stream per scope_notes (Rule 3), (3) rewrote Next proxies to forward SSE body (plan said verify only) (Rule 3), (4) dropped unused classify import after handler rewrite (Rule 1)."
-last_updated: "2026-08-21T16:18:00.000Z"
+stopped_at: "Completed 01-Z-PLAN.md — Phase 1 gap-closure G-1-16 closed: operator chose accept-as-design (decision b) after webfetch of platform.claude.com/docs/en/about-claude/pricing on 2026-08-21 confirmed opencode-go/hy3 has no published per-token rate. lib/pricing.ts:24 comment now records the verification date, source, and upgrade path (Phase 2+ paid-tier model); $0/$0 row preserved; cost counter shows $0.00 by design. Phase 1 gap-closure batch complete: 26/26 plans done. Ready for /gsd-verify-work 1, then /gsd-plan-phase 2."
+last_updated: "2026-08-21T16:30:00.000Z"
 progress:
   total_phases: 1
   completed_phases: 1
   total_plans: 26
-  completed_plans: 25
-current_plan: Y
+  completed_plans: 26
+current_plan: Z
 total_plans: 26
 ---
 
