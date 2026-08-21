@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: Completed 01-S-PLAN.md — gap closure G-1-14 (ragQueryTool imported, registered on sdlcAgent, and instructions extended so the model can retrieve tool docs)
-last_updated: "2026-08-21T00:26:45.000Z"
+stopped_at: Completed 01-N-PLAN.md — G-1-7 observability hooks shipped ([approval-resolver] + [chat-debug]); Task 2 deferred per Rule 4 (Mastra 1.60 AgentConfigBase has no top-level requireToolApproval)
+last_updated: "2026-08-21T00:42:18.681Z"
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 19
-  completed_plans: 17
-current_plan: S
+  completed_plans: 18
+current_plan: N
 total_plans: 19
 ---
 
@@ -32,7 +32,7 @@ total_plans: 19
 - **Phase:** 2 — Notion MCP Integration
 - **Plans:** 6 PLAN files; 01-A, 01-B, 01-C, 01-D, 01-E, 01-F complete
 - **Status:** Phase 1 complete; ready for `/gsd-verify-work` then `/gsd-plan-phase 2`
-- **Progress:** [█████████░] 89%
+- **Progress:** [██████████] 95%
 - **Next action:** Run `/gsd-verify-work 1` (phase verification against SKELETON.md + UAT.md), then `/gsd-plan-phase 2` (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
@@ -68,6 +68,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 01 PQ | 6 | 2 tasks | 5 files |
 | Phase 1 PR | 6 | 1 tasks | 2 files |
 | Phase 1 PS | 5 | 1 tasks | 1 files |
+| Phase 01 PN | 5 | 1 tasks | 2 files |
 
 ## Decisions Log (from executed plans)
 
@@ -99,6 +100,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-21 | G-1-11 closed: pause/resume persists chat messages — worker SuspendedRun stores messages snapshot, new GET /sessions/:id/messages endpoint, browser beacon sends messages alongside sessionId, ChatPanel fetches /api/messages on mount and seeds useChat (in-memory Map; Phase 8 adds durable persistence) | 01-Q |
 | 2026-08-21 | G-1-12 closed: withAudit threads sessionId via module-scope `currentSessionId` + `setAuditSessionId()` setter (Mastra 1.60 tool runner invokes execute(args) with one arg — ctx never populated); INSERT wrapped in try/catch + console.error; stream route calls setter immediately after body destructure; chat stream does not break on audit failure | 01-R |
 | 2026-08-21 | G-1-14 closed: ragQueryTool imported (worker/src/agents/sdlc.ts:6), registered on sdlcAgent tools object (line 27), and agent instructions extended (lines 22-23) to mirror the tool description's 'Call rag_query BEFORE invoking any MCP tool whose usage you are unsure about' prompt — chat can now trigger tool_docs retrieval; audit_log row will record tool_doc_rows_consumed >= 1 | 01-S |
+| 2026-08-21 | 01-N deviation Rule 4: Task 2 (Agent-constructor `requireToolApproval` wiring) ROLLED BACK — Mastra 1.60's `AgentConfigBase` does not expose `requireToolApproval` as a top-level field. TypeScript rejects with TS2353 ("Object literal may only specify known properties"); runtime Agent constructor never reads `config.requireToolApproval` (verified against `node_modules/.pnpm/@mastra+core@1.60.0_*/node_modules/@mastra/core/dist/agent-BVtn9FqD.cjs` lines 32200-32360). Task 1 observability hooks shipped ([approval-resolver] in toolApprovalResolver body, [chat-debug] per-chunk in chat for-await loop). Alternative fix `defaultOptions: { requireToolApproval: toolApprovalResolver }` IS valid in 1.60 (deepMerge'd into per-call options at agent-BVtn9FqD.cjs:37176) and noted for a follow-up plan IF operator confirms Candidate A from `.planning/debug/write-low-card-not-shown.md`. | 01-N |
 
 ## Accumulated Context
 
@@ -135,12 +137,12 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-S-PLAN.md — gap closure G-1-14 (ragQueryTool imported, registered on sdlcAgent, and instructions extended so the model can retrieve tool docs)
+**Stopped at:** Completed 01-N-PLAN.md — G-1-7 observability hooks shipped ([approval-resolver] + [chat-debug]); Task 2 deferred per Rule 4 (Mastra 1.60 AgentConfigBase has no top-level requireToolApproval)
 **Resume file:** None
 
-**Last session:** 2026-08-21T00:25:00.997Z
+**Last session:** 2026-08-21T00:42:18.656Z
 
-**Resume command:** `/gsd-verify-work 1` (phase verification) → `/gsd-plan-phase 2` (Notion MCP Integration)
+**Resume command:** `/gsd-execute-phase 1` (continue with 01-O — Phase 1 last remaining plan)
 
 **Next phase to plan:** Phase 2 — Notion MCP Integration
 
