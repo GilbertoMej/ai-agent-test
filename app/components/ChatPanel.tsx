@@ -19,23 +19,17 @@ import type { ModelId } from "@/lib/pricing";
 // 01-10 / UI-03 / UI-05 — ActionFeed renders inline bubbles for every tool part;
 // TransientAgentError retried 3 times (1s/2s/4s); permanent errors surface toast.
 
+// ToolApprovalPart — the shape ChatPanel builds locally before handing to
+// <ApprovalCard />. NOT a wire part type; the wire carries `tool-<name>` parts
+// with `state: 'approval-requested'` + `approval: { id, ... }` (see
+// ai/src/ui/process-ui-message-stream.ts:746-758 — the approval-request chunk
+// MUTATES the existing tool part rather than pushing a new top-level part).
 interface ToolApprovalPart {
   type: string;
   toolCallId?: string;
   toolName?: string;
   args?: Record<string, unknown>;
   tier?: ApprovalTier;
-}
-
-// AI SDK v5 — approval-request chunk has { approvalId, toolCallId }.
-// Args + toolName live on the linked tool part (`tool-<name>` with same toolCallId).
-type ApprovalRequestPart = { type: "tool-approval-request"; approvalId: string; toolCallId: string };
-type ToolPart = { type: string; toolCallId?: string; toolName?: string; input?: Record<string, unknown> };
-
-function lookupToolPart(parts: unknown[], toolCallId: string): ToolPart | undefined {
-  return (parts as ToolPart[]).find(
-    (p) => typeof p?.type === "string" && p.type.startsWith("tool-") && p.toolCallId === toolCallId,
-  );
 }
 
 // Marks an error as transient — these get retried with backoff. Network errors / 5xx / timeout.
@@ -242,22 +236,35 @@ export function ChatPanel() {
                 })}
                 <ActionFeed parts={parts} />
                 {parts.map((p, i) => {
-                  if (p.type !== "tool-approval-request") return null;
-                  const ap = p as unknown as ApprovalRequestPart;
-                  const toolPart = lookupToolPart(parts, ap.toolCallId);
-                  const toolName = (toolPart?.toolName) ?? (toolPart?.type?.startsWith("tool-") ? toolPart.type.slice("tool-".length) : "unknown");
+                  // AI SDK v7: the tool-approval-request chunk MUTATES the existing tool part
+                  // (looked up by toolCallId) to { state: 'approval-requested', approval: { id } }.
+                  // Filter on the tool part's state, not on a non-existent top-level part type.
+                  // ActionFeed.tsx:46-65 uses the same dimension — confirmed correct.
+                  const tp = p as unknown as {
+                    type: string;
+                    toolCallId?: string;
+                    toolName?: string;
+                    input?: Record<string, unknown>;
+                    state?: string;
+                    approval?: { id?: string; isAutomatic?: boolean };
+                  };
+                  if (!tp.type.startsWith("tool-") || tp.state !== "approval-requested") return null;
+                  // ponytail: skip auto-approved tool calls — they have no card to show.
+                  if (tp.approval?.isAutomatic) return null;
+                  // Read toolName/input/approval.id directly from the tool part (no separate lookup).
+                  const toolName = tp.toolName ?? tp.type.slice("tool-".length);
                   const toolClass: ToolClass = toolName ? classify(toolName) : "write_low";
                   const approvalTier: ToolApprovalPart["tier"] = toolClass === "write_high" ? "write_high" : "write_low";
                   const approvalPart: ToolApprovalPart = {
-                    type: "tool-approval-request",
-                    toolCallId: ap.toolCallId,
+                    type: tp.type,
+                    toolCallId: tp.toolCallId,
                     toolName,
-                    args: toolPart?.input ?? {},
+                    args: tp.input ?? {},
                     tier: approvalTier,
                   };
                   return (
                     <ApprovalCard
-                      key={`card-${i}`}
+                      key={`card-${tp.toolCallId ?? i}`}
                       tier={approvalPart.tier ?? "write_low"}
                       toolName={approvalPart.toolName ?? "unknown"}
                       args={approvalPart.args ?? {}}
