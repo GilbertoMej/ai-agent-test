@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Notion MCP Integration
 status: planning
-stopped_at: Completed 01-O-PLAN.md — Phase 1 last gap closure: toolApprovalResolver now reads approvalMode via RequestContext.getRaw with property-access fallback (G-1-9 closed); Phase 1 fully complete (19/19 plans), ready for /gsd-verify-work
-last_updated: "2026-08-21T00:48:00.000Z"
+stopped_at: "Completed 01-T-PLAN.md — Phase 1 gap-closure G-1-14b: resolver normalizes tools:{} property keys before classify (ragQuery/echo/createNote/applyMigrations)"
+last_updated: "2026-08-21T14:54:44.552Z"
 progress:
   total_phases: 1
   completed_phases: 1
-  total_plans: 19
-  completed_plans: 19
-current_plan: O
-total_plans: 19
+  total_plans: 26
+  completed_plans: 20
+current_plan: T
+total_plans: 26
 ---
 
 # Project State: SDLC AI Agent Playground
@@ -30,10 +30,10 @@ total_plans: 19
 ## Current Position
 
 - **Phase:** 2 — Notion MCP Integration
-- **Plans:** 19/19 plans complete (01-A..01-S, 01-O); Phase 1 fully closed
-- **Status:** Phase 1 complete; ready for `/gsd-verify-work` then `/gsd-plan-phase 2`
-- **Progress:** [██████████] 100%
-- **Next action:** Run `/gsd-verify-work 1` (phase verification against SKELETON.md + UAT.md), then `/gsd-plan-phase 2` (Notion MCP Integration).
+- **Plans:** 20/26 plans complete (01-A..01-S, 01-O, 01-T); Phase 1 gap-closure batch in progress (T, U, V, W, X, Y, Z)
+- **Status:** Phase 1 77% complete (gap-closure batch executing); ready for `/gsd-verify-work` once all gap closures done
+- **Progress:** [████████░░] 77%
+- **Next action:** Run `/gsd-execute-phase 01-foundation` to execute 01-U, 01-V, 01-W, 01-X, 01-Y, 01-Z gap closures, then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration).
 
 ### Plan-file split (revision-2)
 
@@ -51,7 +51,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Metric | Value |
 |--------|-------|
 | Phases planned | 8 |
-| Phases complete | 0 |
+| Phases complete | 1 |
 | Plans executed | 4 |
 | Plans halted | 0 |
 | Plans verified | 0 |
@@ -70,6 +70,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | Phase 1 PS | 5 | 1 tasks | 1 files |
 | Phase 01 PN | 5 | 1 tasks | 2 files |
 | Phase 01 PO | 5 | 1 tasks | 1 files |
+| Phase 1 PT | 5 | 1 tasks | 1 files |
 
 ## Decisions Log (from executed plans)
 
@@ -103,6 +104,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 | 2026-08-21 | G-1-14 closed: ragQueryTool imported (worker/src/agents/sdlc.ts:6), registered on sdlcAgent tools object (line 27), and agent instructions extended (lines 22-23) to mirror the tool description's 'Call rag_query BEFORE invoking any MCP tool whose usage you are unsure about' prompt — chat can now trigger tool_docs retrieval; audit_log row will record tool_doc_rows_consumed >= 1 | 01-S |
 | 2026-08-21 | 01-N deviation Rule 4: Task 2 (Agent-constructor `requireToolApproval` wiring) ROLLED BACK — Mastra 1.60's `AgentConfigBase` does not expose `requireToolApproval` as a top-level field. TypeScript rejects with TS2353 ("Object literal may only specify known properties"); runtime Agent constructor never reads `config.requireToolApproval` (verified against `node_modules/.pnpm/@mastra+core@1.60.0_*/node_modules/@mastra/core/dist/agent-BVtn9FqD.cjs` lines 32200-32360). Task 1 observability hooks shipped ([approval-resolver] in toolApprovalResolver body, [chat-debug] per-chunk in chat for-await loop). Alternative fix `defaultOptions: { requireToolApproval: toolApprovalResolver }` IS valid in 1.60 (deepMerge'd into per-call options at agent-BVtn9FqD.cjs:37176) and noted for a follow-up plan IF operator confirms Candidate A from `.planning/debug/write-low-card-not-shown.md`. | 01-N |
 | 2026-08-21 | G-1-9 closed: toolApprovalResolver reads approvalMode via `rc.getRaw?.("approvalMode") ?? rc.approvalMode` — defensive read covering Mastra 1.60's RequestContext class instance (private Map; values only via `.getRaw(key)`) AND any future plain-object shape. Property access previously always returned undefined so 'tiered' and 'always' both fell through to the gate path; the toggle contrast is now reachable through the resolver. Implements HITL-02 end-to-end. | 01-O |
+| 2026-08-21 | G-1-14b closed: toolApprovalResolver normalizes tools:{} property keys (ragQueryTool → ragQuery, etc.) before calling classify/resolveApproval — 2-line `normalizeToolName` helper strips trailing "Tool" suffix. Read tools (echo, rag_query) no longer fall through to write_high; resolver returns false → Mastra 1.60 no longer suspends the workflow before tool execution; rag_query tool result reaches the client. Implements HITL-01 + RAG-02. | 01-T |
 
 ## Accumulated Context
 
@@ -139,12 +141,12 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-O-PLAN.md — Phase 1 last gap closure: toolApprovalResolver now reads approvalMode via RequestContext.getRaw with property-access fallback (G-1-9 closed); Phase 1 fully complete (19/19 plans), ready for /gsd-verify-work
+**Stopped at:** Completed 01-T-PLAN.md — Phase 1 gap-closure G-1-14b: resolver normalizes tools:{} property keys before classify (ragQuery/echo/createNote/applyMigrations)
 **Resume file:** None
 
-**Last session:** 2026-08-21T00:48:00.000Z
+**Last session:** 2026-08-21T14:54:44.517Z
 
-**Resume command:** `/gsd-verify-work 1` (phase verification against SKELETON.md + UAT.md), then `/gsd-plan-phase 2` (Notion MCP Integration)
+**Resume command:** `/gsd-execute-phase 01-foundation` to continue gap-closure batch (01-U, 01-V, 01-W, 01-X, 01-Y, 01-Z), then `/gsd-verify-work 1`, then `/gsd-plan-phase 2` (Notion MCP Integration)
 
 **Next phase to plan:** Phase 2 — Notion MCP Integration
 
@@ -173,3 +175,7 @@ Phase 1 is split into 4 PLAN files under `.planning/phases/01-foundation/plans/`
 ---
 
 *State initialized: 2026-08-18*
+
+## Decisions
+
+(Inline in the Decisions Log table above.)
