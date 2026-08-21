@@ -94,7 +94,13 @@ export function ChatPanel() {
   const { messages, sendMessage, status } = useChat<UIMessage>({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: { approvalMode, sessionId },
+      // ponytail: body must be a function so `resolve()` re-reads the React
+      // closure on every sendMessage. The captured transport on first render
+      // would otherwise hold sessionId="" for the lifetime of the Chat instance
+      // (useRef captures Chat once — see @ai-sdk/react useChat source).
+      // Static object form is captured at construction; only the function form
+      // surfaces post-mount setSessionId(fresh) to the worker.
+      body: () => ({ approvalMode, sessionId }),
     }) as never,
     messages: initialMessages,
   });
