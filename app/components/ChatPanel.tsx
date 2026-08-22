@@ -66,6 +66,49 @@ export async function withTransientRetry<T>(fn: () => Promise<T>, label: string)
   throw lastErr;
 }
 
+// Patches the chat transcript after a tool approval/decline: flips the matching
+// tool part out of `approval-requested` into `output-available` (or `output-error`
+// when the result carries an `error`), and appends the assistant's follow-up reply.
+// Keeps the React transcript authoritative so we never depend on /api/messages.
+function applyApprovalToMessages(
+  msgs: UIMessage[],
+  toolCallId: string,
+  output: unknown,
+  assistantText: string,
+): UIMessage[] {
+  const next = msgs.map((m) => {
+    const parts = (m.parts ?? []) as Array<Record<string, unknown>>;
+    // Drop the data-approval-request part (the card) and patch the matching tool part.
+    const filtered = parts.filter((p) => p.type !== "data-approval-request");
+    const hasTool = filtered.some(
+      (p) => typeof p.type === "string" && p.type.startsWith("tool-") && p.toolCallId === toolCallId,
+    );
+    if (!hasTool) {
+      // No tool part to patch, but still discard the (now-resolved) approval card.
+      return filtered.length === parts.length ? m : { ...m, parts: filtered };
+    }
+    return {
+      ...m,
+      parts: filtered.map((p) => {
+        if (typeof p.type === "string" && p.type.startsWith("tool-") && p.toolCallId === toolCallId) {
+          const isErr = !!output && typeof output === "object" && "error" in (output as Record<string, unknown>);
+          return {
+            ...p,
+            state: isErr ? "output-error" : "output-available",
+            output,
+            ...(isErr ? { errorText: String((output as Record<string, unknown>).error) } : {}),
+          };
+        }
+        return p;
+      }),
+    };
+  });
+  if (assistantText.trim()) {
+    next.push({ id: crypto.randomUUID(), role: "assistant", parts: [{ type: "text", text: assistantText }] });
+  }
+  return next as unknown as UIMessage[];
+}
+
 export function ChatPanel() {
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("tiered");
   // 01-F2 — initialize sessionId to a stable empty string so SSR + first client paint
@@ -73,6 +116,13 @@ export function ChatPanel() {
   // post-mount useEffect below, which triggers a single re-render.
   // 01-13 / UI-04 — session id persists across refresh via localStorage key `sdlc.playground.session.v1`.
   const [sessionId, setSessionId] = useState<string>("");
+  // Refs mirror sessionId/approvalMode so the chat transport body (built once on
+  // first render, never re-read by useChat) still sends the LIVE values. The first
+  // render captures "" — without refs the chat POST stashes the suspended run under
+  // `::toolCallId` while approve() sends the real `sess-…`, so the lookup misses
+  // and the resumed answer is never delivered.
+  const sessionIdRef = useRef<string>("");
+  const approvalModeRef = useRef<ApprovalMode>("tiered");
   const [input, setInput] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -96,7 +146,9 @@ export function ChatPanel() {
   const { messages, sendMessage, status, setMessages } = useChat<UIMessage>({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({ approvalMode, sessionId }),
+      // ponytail: read from refs so useChat always sends the live sessionId/approvalMode,
+      // even though the transport instance is captured from the first render.
+      body: () => ({ approvalMode: approvalModeRef.current, sessionId: sessionIdRef.current }),
     }) as never,
   });
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -176,6 +228,7 @@ export function ChatPanel() {
     if (typeof window === "undefined") return;
     const existing = loadSessionId();
     if (existing) {
+      sessionIdRef.current = existing;
       setSessionId(existing);
       // Fetch prior messages for this session; push them into useChat's
       // internal messages array via setMessages (the documented API for
@@ -190,7 +243,9 @@ export function ChatPanel() {
         .catch(() => { /* no prior messages — keep empty */ });
       return;
     }
-    const fresh = `sess-${Math.random().toString(36).slice(2, 10)}`; saveSessionId(fresh); setSessionId(fresh);
+    const fresh = `sess-${Math.random().toString(36).slice(2, 10)}`;
+    sessionIdRef.current = fresh;
+    saveSessionId(fresh); setSessionId(fresh);
   }, [setMessages]);
 
   useEffect(() => {
@@ -199,43 +254,79 @@ export function ChatPanel() {
     return () => clearTimeout(id);
   }, [toast]);
 
+  // 01-Y (realized) — consume the resumed SSE inline instead of reloading.
+  // The worker /approval/approve pipes the resumed MastraModelOutput.fullStream back
+  // as SSE (tool-result + assistant follow-up). We parse it here and patch the
+  // existing tool part + append the assistant reply via setMessages. No reload:
+  // reload loses the streamed answer and depends on /api/messages, which is empty
+  // (suspendedRuns.messages is never populated).
   const decide = async (decision: "approve" | "decline", part: ToolApprovalPart, pattern?: string) => {
     const url = decision === "approve" ? "/api/approve" : "/api/decline";
+    let res: Response;
     try {
-      // 01-Y — worker resumes the suspended run server-side and pipes the
-      // MastraModelOutput.fullStream back as SSE. The streamed body carries
-      // tool-result + assistant follow-up text; we don't read it in this
-      // React tree (useChat owns the chat transport, and a second concurrent
-      // stream would fight the parser). Instead, reload the page — the
-      // post-mount useEffect's fetch /api/messages populates useChat with
-      // the resumed state, and the user sees the result.
-      await withTransientRetry(
-        () =>
-          fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              toolCallId: part.toolCallId,
-              toolName: part.toolName,
-              args: part.args ?? {},
-              tier: part.tier,
-              pattern,
-              sessionId,
-            }),
-          }),
-        `${decision}:${part.toolName}`,
-      );
+      // ponytail: plain fetch, no withTransientRetry — approval is side-effecting and
+      // a retry would double-approve (second call 404s on the already-cleared run).
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          args: part.args ?? {},
+          tier: part.tier,
+          pattern,
+          sessionId: sessionIdRef.current,
+        }),
+      });
     } catch (e) {
       setToast(`Failed to ${decision}: ${(e as Error).message}`);
       return;
     }
-    // ponytail: window.location.reload() instead of a second sendMessage —
-    // Phase 8 swaps this for a streaming-aware chat pattern that consumes
-    // the resumed stream inline. The page-refresh loses any in-flight typing
-    // (acceptable for a single-user Phase 1 demo).
-    if (typeof window !== "undefined") {
-      window.location.reload();
+    if (!res.ok || !res.body) {
+      setToast(`Failed to ${decision}: worker returned ${res.status}`);
+      return;
     }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let assistantText = "";
+    let output: unknown = undefined;
+    const pendingToolCallId = part.toolCallId;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n\n")) !== -1) {
+          const raw = buf.slice(0, nl);
+          buf = buf.slice(nl + 2);
+          const dataLine = raw.split("\n").find((l) => l.startsWith("data:"));
+          if (!dataLine) continue;
+          const payload = dataLine.slice("data:".length).trim();
+          if (payload === "[DONE]") continue;
+          try {
+            const ev = JSON.parse(payload) as {
+              type?: string;
+              delta?: string;
+              output?: unknown;
+              toolCallId?: string;
+              error?: unknown;
+            };
+            if (ev.type === "text-delta") assistantText += ev.delta ?? "";
+            else if (ev.type === "tool-output-available" && ev.toolCallId === pendingToolCallId) output = ev.output;
+            else if (ev.type === "error") {
+              setToast(`Resume error: ${String(ev.error ?? "unknown")}`);
+              return;
+            }
+          } catch { /* skip malformed event */ }
+        }
+      }
+    } catch (e) {
+      setToast(`Resume stream error: ${(e as Error).message}`);
+      return;
+    }
+    setMessages(applyApprovalToMessages(messagesRef.current, pendingToolCallId ?? "", output, assistantText));
   };
 
   return (
@@ -243,8 +334,29 @@ export function ChatPanel() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 12, color: "#8b94a7" }}>Session: {sessionId}</span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (!sessionId) return;
+              const worker = `${window.location.protocol}//${window.location.hostname}:4111`;
+              window.location.href = `${worker}/oauth/notion/start?sessionId=${encodeURIComponent(sessionId)}`;
+            }}
+            disabled={!sessionId}
+            title="Connect your Notion workspace (OAuth)"
+            style={{
+              padding: "4px 10px",
+              borderRadius: 6,
+              border: "1px solid #3a4256",
+              background: "#222a3a",
+              color: "#e6e6e6",
+              cursor: sessionId ? "pointer" : "default",
+              fontSize: 12,
+            }}
+          >
+            Connect Notion
+          </button>
           <CostCounter messages={messages as unknown as Parameters<typeof CostCounter>[0]["messages"]} model={((messages.at(-1) as unknown as { metadata?: { modelId?: string } } | undefined)?.metadata?.modelId ?? "opencode-go/hy3") as ModelId} />
-          <AutoApproveToggle value={approvalMode} onChange={setApprovalMode} />
+          <AutoApproveToggle value={approvalMode} onChange={(v) => { setApprovalMode(v); approvalModeRef.current = v; }} />
         </div>
       </div>
       <div
@@ -290,35 +402,29 @@ export function ChatPanel() {
                 })}
                 <ActionFeed parts={parts} />
                 {parts.map((p, i) => {
-                  // AI SDK v7: the tool-approval-request chunk MUTATES the existing tool part
-                  // (looked up by toolCallId) to { state: 'approval-requested', approval: { id } }.
-                  // Filter on the tool part's state, not on a non-existent top-level part type.
-                  // ActionFeed.tsx:46-65 uses the same dimension — confirmed correct.
+                  // AI SDK v5 (the installed @ai-sdk/react client) has NO approval-requested
+                  // state and ignores the v7 `tool-approval-request` chunk. The worker signals a
+                  // pending approval via a custom `data-approval-request` part (v5 stores data-*
+                  // chunks as parts with `.data`). Render the card from that part's data.
                   const tp = p as unknown as {
                     type: string;
-                    toolCallId?: string;
-                    toolName?: string;
-                    input?: Record<string, unknown>;
-                    state?: string;
-                    approval?: { id?: string; isAutomatic?: boolean };
+                    data?: { toolCallId?: string; toolName?: string; input?: Record<string, unknown> };
                   };
-                  if (!tp.type.startsWith("tool-") || tp.state !== "approval-requested") return null;
-                  // ponytail: skip auto-approved tool calls — they have no card to show.
-                  if (tp.approval?.isAutomatic) return null;
-                  // Read toolName/input/approval.id directly from the tool part (no separate lookup).
-                  const toolName = tp.toolName ?? tp.type.slice("tool-".length);
+                  if (tp.type !== "data-approval-request") return null;
+                  const ap = tp.data ?? {};
+                  const toolName = ap.toolName ?? "";
                   const toolClass: ToolClass = toolName ? classify(toolName) : "write_low";
                   const approvalTier: ToolApprovalPart["tier"] = toolClass === "write_high" ? "write_high" : "write_low";
                   const approvalPart: ToolApprovalPart = {
                     type: tp.type,
-                    toolCallId: tp.toolCallId,
+                    toolCallId: ap.toolCallId,
                     toolName,
-                    args: tp.input ?? {},
+                    args: ap.input ?? {},
                     tier: approvalTier,
                   };
                   return (
                     <ApprovalCard
-                      key={`card-${tp.toolCallId ?? i}`}
+                      key={`card-${ap.toolCallId ?? i}`}
                       tier={approvalPart.tier ?? "write_low"}
                       toolName={approvalPart.toolName ?? "unknown"}
                       args={approvalPart.args ?? {}}

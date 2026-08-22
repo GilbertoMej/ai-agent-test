@@ -1,5 +1,8 @@
 import { Agent } from "@mastra/core/agent";
-import type { ToolApprovalContext } from "@mastra/core/tools";
+import type { Tool, ToolApprovalContext } from "@mastra/core/tools";
+import { MCPClient } from "@mastra/mcp";
+import { join } from "node:path";
+import { getActiveNotionToken } from "../lib/notion-oauth";
 import { echoTool } from "../tools/echo";
 import { createNoteTool } from "../tools/create-note";
 import { applyMigrationsTool } from "../tools/apply-migrations";
@@ -14,37 +17,99 @@ import { resolveApproval, loadActiveGrants, type ApprovalMode } from "../lib/app
 // `provider/model` string and Mastra auto-routes via the provider registry.
 // `modelSettings: { maxTokens }` moved off the agent config — Mastra 1.60 only accepts
 // it inside a model-fallbacks array. Per-call `agent.stream(messages, { maxTokens })` covers it.
-// Key -> tool id, derived from the tools object so classify() (which matches
-// IDs) always sees the canonical name. Mastra 1.60 passes the property KEY
-// (e.g. ragQueryTool) to the approval resolver, not the id (rag_query) — without
-// this mapping rag_query normalizes to "ragQuery", misses classify(), and falls
-// through to write_high, gating RAG in every mode.
-const tools = { echoTool, createNoteTool, applyMigrationsTool, ragQueryTool };
 
-export const sdlcAgent = new Agent({
-  id: "sdlcAgent",
-  name: "SDLC Agent",
-  instructions:
-    "You are the SDLC Playground agent. For Phase 1 (Walking Skeleton), you have echo (read), " +
-    "rag_query (read), createNote (write_low), and applyMigrations (write_high). " +
-    "Call rag_query BEFORE invoking any MCP tool whose usage you are unsure about — it returns the top-5 tool_docs rows relevant to the user's request. " +
-    "Use createNote when the user asks for a note; use applyMigrations when the user asks to migrate. " +
-    "For everything else, answer from chat.",
-  model: "opencode-go/hy3",
-  tools,
-});
+// Phase-1 local tools. Notion MCP tools are merged in at agent-build time
+// (createSdlcAgent) when NOTION_TOKEN is configured, so the builder is async.
+const localTools = { echoTool, createNoteTool, applyMigrationsTool, ragQueryTool };
 
-// Mastra 1.60 passes the property KEY (e.g. "ragQueryTool") to
-// ToolApprovalContext, not the tool's `id` ("rag_query"). classify() matches
-// ids, so normalizeToolName maps key -> id (TOOL_KEY_TO_ID below) before
-// classifying. Without it, rag_query normalizes to "ragQuery", misses
-// classify(), falls through to write_high, and the resolver gates RAG.
+// Absolute path to the installed Notion MCP server binary. The worker launches
+// from the repo root (pnpm dev), so cwd-relative resolution is stable; joining
+// with process.cwd() makes it absolute regardless.
+const notionBin = join(process.cwd(), "node_modules/@notionhq/notion-mcp-server/bin/cli.mjs");
+
+// Builds the agent with local + Notion MCP tools merged. Async because the MCP
+// client connects lazily on listTools(); the agent can't be a module-level const
+// under CJS (top-level await is invalid — see index.ts 01-G1).
+export async function createSdlcAgent(): Promise<Agent> {
+  const notionTools = await loadNotionTools();
+  const tools = { ...localTools, ...notionTools } as Record<string, Tool>;
+  return new Agent({
+    id: "sdlcAgent",
+    name: "SDLC Agent",
+    instructions:
+      "You are the SDLC Playground agent. For Phase 1 (Walking Skeleton), you have echo (read), " +
+      "rag_query (read), createNote (write_low), and applyMigrations (write_high). " +
+      "Call rag_query BEFORE invoking any MCP tool whose usage you are unsure about — it returns the top-5 tool_docs rows relevant to the user's request. " +
+      "When the user works with Notion (pages, databases, blocks, search), use the Notion MCP tools. " +
+      "Use createNote when the user asks for a note; use applyMigrations when the user asks to migrate. " +
+      "For everything else, answer from chat.",
+    model: "opencode-go/hy3",
+    tools,
+  });
+}
+
+// Map Mastra's property key -> the tool's declared id so classify() matches.
+// Derived from `localTools`; fallback strips a "Tool" suffix for any new tool.
+// Notion MCP tools keep their own names (notion_*) and fall through classify()
+// to write_high (gated) — expected for unmapped external tools.
 const TOOL_KEY_TO_ID: Record<string, string> = Object.fromEntries(
-  Object.entries(tools).map(([k, v]) => [k, (v as { id: string }).id]),
+  Object.entries(localTools).map(([k, v]) => [k, (v as { id: string }).id]),
 ) as Record<string, string>;
 
 function normalizeToolName(n: string): string {
   return TOOL_KEY_TO_ID[n] ?? (n.endsWith("Tool") ? n.slice(0, -4) : n);
+}
+
+// Self-host the official Notion MCP server (STDIO). mcp.notion.com is Notion's
+// first-party MCP: its authorization_servers is ["https://mcp.notion.com"], so it
+// only trusts tokens IT issues — our integration/OAuth token (from api.notion.com)
+// is rejected there with invalid_token. The local server takes our token via
+// OPENAPI_MCP_HEADERS and calls the Notion API directly, which accepts it.
+// Auth: prefers the per-session OAuth token (set after Connect Notion), else a
+// static NOTION_TOKEN. Returns {} when neither exists so boot degrades gracefully.
+async function loadNotionTools(): Promise<Record<string, Tool>> {
+  const token = getActiveNotionToken() ?? process.env.NOTION_TOKEN;
+  if (!token) {
+    console.warn("[notion-mcp] no Notion token (OAuth not connected and NOTION_TOKEN unset) — Notion MCP tools disabled");
+    return {};
+  }
+  try {
+    const client = new MCPClient({
+      id: "notion",
+      servers: {
+        notion: {
+          command: "node",
+          // Run the installed binary directly (avoids `npx`, which hangs resolving
+          // against pnpm's symlinked layout). notionBin is an absolute path.
+          args: [notionBin],
+          env: {
+            ...process.env,
+            OPENAPI_MCP_HEADERS: JSON.stringify({ Authorization: `Bearer ${token}` }),
+          },
+        },
+      },
+    });
+    const tools = await client.listTools();
+    console.log(`[notion-mcp] connected — ${Object.keys(tools).length} tools (local @notionhq/notion-mcp-server)`);
+    return tools as Record<string, Tool>;
+  } catch (e) {
+    console.error(`[notion-mcp] failed to load: ${(e as Error).message}`);
+    return {};
+  }
+}
+
+// Live agent reference. Rebuilt after a successful Notion OAuth so the Notion
+// MCP tools (which need a per-session token) become available without restart.
+let currentAgent: Agent | null = null;
+
+export async function getSdlcAgent(): Promise<Agent> {
+  if (!currentAgent) currentAgent = await createSdlcAgent();
+  return currentAgent;
+}
+
+export async function rebuildSdlcAgent(): Promise<Agent> {
+  currentAgent = await createSdlcAgent();
+  return currentAgent;
 }
 
 // Per-call `requireToolApproval` resolver (Mastra 1.60 signature).
